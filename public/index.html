@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kivra</title>
+<style>
+:root{color-scheme:dark;--bg:#0c0c0e;--fg:#f4f1f3;--mut:#a89aa2;--card:#17171a;--bd:#2c2429;--ac:#a8124f;--ac2:#ee5a96}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+a{color:var(--ac)}
+.aviso{background:var(--ac);color:#fff;text-align:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;font-weight:600;font-size:14px}
+nav{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+button,select,input,textarea{font:inherit;color:var(--fg)}
+button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.on{border-color:var(--ac);color:var(--ac)}
+main{max-width:980px;margin:0 auto;padding:16px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:9px;margin:4px 0 10px}
+label{font-size:13px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.card .b{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1}
+.pr{font-weight:700;font-size:18px}.mut{color:var(--mut);font-size:13px}
+.row{display:flex;gap:6px;flex-wrap:wrap}.row>*{flex:1}
+.box{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.modal{position:fixed;inset:0;background:#0008;display:flex;justify-content:center;overflow:auto;padding:16px}
+.modal>div{background:var(--bg);border-radius:12px;padding:16px;max-width:460px;width:100%;margin:auto}
+.err{color:#d33;font-size:13px;min-height:16px}
+.tag{display:inline-block;font-size:12px;background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:1px 8px}
+.vale{font-size:20px;font-weight:700;padding:16px 8px}
+table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
+.sc{overflow-x:auto}
+a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
+.hero{position:relative;border-radius:14px;overflow:hidden;min-height:400px;color:#fff;background:radial-gradient(ellipse at 50% 35%,#7d1040,#0c0c0e 72%);border:1px solid var(--bd)}
+.sl{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 64px 56px;gap:12px}
+.sl.on{display:flex}
+.k{letter-spacing:.3em;font-size:13px;color:#f3c1d6}
+.h{font-size:clamp(34px,8vw,64px);font-weight:800;line-height:1.05}
+.cp{border:1px solid #f3c1d666;border-radius:12px;padding:10px 22px;max-width:440px}
+.hb{background:#fff;color:#111;border:0;font-weight:700;letter-spacing:.08em;padding:12px 28px}
+.ar{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:#ffffff33;border:0;color:#fff;font-size:20px;padding:0;z-index:2}
+.ctl{position:absolute;left:16px;bottom:14px;display:flex;gap:8px;align-items:center;z-index:2}
+.dt{width:8px;height:8px;border-radius:50%;background:#fff6;padding:0;border:0}.dt.on{width:28px;border-radius:6px;background:#fff}
+.ps{width:28px;height:28px;border-radius:50%;background:#ffffff33;border:0;color:#fff;padding:0;font-size:12px}
+.app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#3d0820,#a8124f);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
+.app button{background:#fff;color:#111;border:0;font-weight:700}
+</style></head><body>
+<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo watzzap, compras feitas para fora do pais não seram reembolsadas</div>
+<nav id="nav"></nav><main id="app"></main><div id="mod"></div>
+<script>
+const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',vale_presente:'Vale presente'};
+const NEED={roupas:['tam'],calcados:['tam'],bolsas:[],perfumes:['nome'],cosmeticos:['nome']};
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl=v=>'R$ '+Number(v).toFixed(2).replace('.',',');
+const digits=s=>String(s||'').replace(/\D/g,'');
+const dt=t=>new Date(t).toLocaleString('pt-BR');
+const val=i=>$('#'+i)?.value.trim();
+async function api(u,m='GET',b){
+ const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+ let d={};try{d=await r.json()}catch(e){}
+ if(!r.ok)throw new Error(d.erro||'Erro no servidor ('+r.status+')');return d}
+function img(file,max=700){return new Promise((ok,no)=>{const r=new FileReader();r.onerror=no;r.onload=()=>{const i=new Image();i.onerror=no;i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.7))};i.src=r.result};r.readAsDataURL(file)})}
+const inp=(id,l,v='',a='')=>`<label>${l}</label><input id="${id}" value="${esc(v)}" ${a}>`;
+const bt=(x,t,d='',c='')=>`<button class="${c}" data-x="${x}" ${d}>${t}</button>`;
+
+let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null;
+function go(v,a){view=v;arg=a;draw()}
+function nav(){
+ const b=(v,t)=>`<button data-x="go" data-v="${v}" class="${view==v?'on':''}">${t}</button>`;
+ $('#nav').innerHTML=b('inicio','🏠 Início')+b('prod','🔎 Produtos')+(eu.logado?b('meus','Meus pedidos'):'')+
+  (eu.papel=='vendedor'?b('vend','🏪 Minha loja'):'')+(eu.papel=='admin'?b('adm','🛡️ ADM'):'')+
+  (eu.logado?bt('sair','Sair'):b('conta','Entrar / Criar conta'));
+}
+async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+async function init(){try{eu=await api('/api/eu')}catch(e){}const l=new URLSearchParams(location.search).get('loja');l?go('loja',l):go('inicio')}
+
+/* ---------- vitrine ---------- */
+function card(p,del){P[p.id]=p;return `<div class="card"><img src="${p.foto}" alt=""><div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`<div class="row">${bt('buy','Pagar via Pix',`data-id="${p.id}" data-m="pix"`,'p')}${bt('buy','Pagar via cartão',`data-id="${p.id}" data-m="cartao"`,'p')}</div>`}</div></div>`}
+let sl=0,tm=null,pausa=false,dp=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
+function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
+async function vInicio(){
+ const [av,lj]=await Promise.all([api('/api/inicio'),api('/api/lojas')]);
+ const S=[{k:'ROUPAS • CALÇADOS • BOLSAS • PERFUMES',s:'COSMÉTICOS • VALE PRESENTE',h:'Kivra',c:'Compre direto das melhores lojas',b:'COMPRAR',v:'prod'},
+  ...av.filter(a=>a.tipo=='promocao').slice(0,5).map(a=>({k:a.loja_nome.toUpperCase(),s:'PROMOÇÃO',h:a.titulo,c:a.texto,b:'VER LOJA',v:'loja',a:a.slug}))];
+ const es=av.filter(a=>a.tipo=='estoque');
+ sl=0;
+ app.innerHTML=`<div class="hero">${S.map((x,i)=>`<div class="sl ${i?'':'on'}"><div class="k">${esc(x.k)}</div><div class="k">${esc(x.s)}</div><div class="h">${esc(x.h)}</div>${x.c?`<div class="cp">${esc(x.c)}</div>`:''}<button class="hb" data-x="go" data-v="${x.v}" ${x.a?`data-a="${x.a}"`:''}>${x.b}</button></div>`).join('')}
+ ${S.length>1?`<button class="ar" style="left:12px" data-x="pass" data-n="-1">‹</button><button class="ar" style="right:12px" data-x="pass" data-n="1">›</button>`:''}
+ <div class="ctl">${S.map((x,i)=>`<button class="dt ${i?'':'on'}" data-x="dot" data-i="${i}"></button>`).join('')}<button class="ps" data-x="pausa">⏸</button></div></div>
+ <div class="app"><div><b>Instale o app Kivra</b><div style="opacity:.85">Tenha tudo em um só lugar, no computador ou no celular.</div></div><button data-x="instalar">Instalar</button></div>
+ ${lj.length?`<h3>Lojas</h3><div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}
+ ${es.length?`<h3>Atualizações de estoque</h3>`+es.map(a=>`<div class="box"><span class="tag">📦 Estoque</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):''}`;
+ clearInterval(tm);tm=setInterval(()=>{if(!pausa&&view=='inicio')slide(sl+1)},5000);
+}
+async function vInicioOld(){
+ const [av,lj]=await Promise.all([api('/api/inicio'),api('/api/lojas')]);
+ app.innerHTML=`<h1 style="margin:6px 0">Kivra</h1><p class="mut">Promoções, atualizações de estoque e lojas parceiras.</p>${lj.length?`<div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}`+
+ (av.length?av.map(a=>`<div class="box"><span class="tag">${a.tipo=='estoque'?'📦 Estoque':'🏷️ Promoção'}</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):'<p class="mut">Ainda não há novidades.</p>');
+}
+async function vProd(){
+ const sel=Object.entries(CL).map(([k,n])=>`<option value="${k}" ${Q.classe==k?'selected':''}>${n}</option>`).join('');
+ let lista='';
+ if(Q.classe=='vale_presente'){const lj=await api('/api/lojas');lista=`<p class="mut">Escolha a loja para comprar o vale presente:</p><div class="row">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`}
+ else{const l=await api('/api/produtos?'+new URLSearchParams(Q));lista=l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="mut">Nenhum produto encontrado.</p>'}
+ app.innerHTML=`<div class="box"><label>Pesquisar</label><input id="q" value="${esc(Q.q)}" placeholder="Nome ou descrição"><div class="row"><div><label>Classe</label><select id="cl"><option value="">Todas</option>${sel}</select></div><div><label>Preço mínimo</label><input id="mn" inputmode="decimal" value="${esc(Q.min)}"></div><div><label>Preço máximo</label><input id="mx" inputmode="decimal" value="${esc(Q.max)}"></div></div>${bt('buscar','Buscar','','p')}</div>`+lista;
+}
+async function vLoja(){
+ const [l,ps]=await Promise.all([api('/api/lojas/'+arg),api('/api/produtos?loja='+arg)]);
+ const w=digits(l.whatsapp),f=l.faixa_preco||{};
+ app.innerHTML=`<h2 style="margin:6px 0">🏪 ${esc(l.nome)}</h2><div class="box"><b>Quem somos nós?</b><p>${esc(l.quem_somos)||'<span class="mut">A loja ainda não preencheu esta seção.</span>'}</p>${f.min!=null?`<span class="tag">Produtos de ${brl(f.min)} a ${brl(f.max)}</span>`:''}</div>
+ <h3>Produtos</h3>${ps.length?`<div class="grid">${ps.map(p=>card(p)).join('')}</div>`:'<p class="mut">Sem produtos no momento.</p>'}
+ <h3>Vale presente</h3><div class="grid">${l.vales.map(v=>`<button class="vale p" data-x="vale" data-loja="${l.id}" data-v="${v}">R$ ${v}</button>`).join('')}</div><br>
+ ${w?`<a href="https://wa.me/55${w.replace(/^55/,'')}" target="_blank" rel="noopener"><button style="width:100%">Não achou o valor que queria? mande uma mensagem para ${esc(l.whatsapp)}</button></a>`:'<p class="mut">Não achou o valor que queria? O vendedor ainda não cadastrou o WhatsApp.</p>'}`;
+}
+async function vMeus(){
+ const o=await api('/api/meus-pedidos');
+ app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${x.metodo}</span><br><span class="mut">${dt(x.criado)}</span></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
+}
+function pedido(it,m){
+ cur={it,m};
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Finalizar pedido</h3><div class="mut">${esc(it.nome)} · ${brl(it.preco)} · ${m=='pix'?'Pix':'Cartão'}</div><br>${inp('f_n','Nome completo')}${inp('f_cep','CEP','','inputmode="numeric" maxlength="9"')}${inp('f_ci','Cidade')}${inp('f_ba','Bairro')}${inp('f_ru','Rua')}${inp('f_nu','Número da casa')}${inp('f_te','Telefone com DDD','','inputmode="tel"')}
+ ${it.vale?'':inp('f_cu','Cupom de desconto (opcional)')+inp('f_va','Código do vale presente (opcional)')}
+ <label>Foto do comprovante${m=='pix'?'':' (opcional)'}</label><input id="f_co" type="file" accept="image/*"><div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('enviar','Enviar pedido','','p')}</div></div></div>`;
+}
+
+/* ---------- conta ---------- */
+function vConta(){
+ app.innerHTML=`<div class="box" style="max-width:440px"><div class="row" style="margin-bottom:10px">${bt('modo','Entrar','data-m="entrar"',modo=='entrar'?'on':'')}${bt('modo','Criar conta','data-m="criar"',modo=='criar'?'on':'')}${bt('modo','Conta de vendedor','data-m="vend"',modo=='vend'?'on':'')}</div>
+ ${inp('e','E-mail','','type="email"')}${inp('s','Senha','','type="password"')}
+ ${modo!='entrar'?inp('s2','Confirmar senha','','type="password"'):''}
+ ${modo=='vend'?inp('cpf','CPF','','inputmode="numeric"')+inp('nl','Nome da loja'):''}
+ <div class="err" id="er"></div><button class="p" style="width:100%" data-x="conta">${modo=='entrar'?'Entrar':'Criar conta'}</button></div>`;
+}
+
+/* ---------- vendedor ---------- */
+async function vVend(){
+ const T=[['loja','Loja'],['prod','Produtos'],['cup','Cupons'],['vale','Vales'],['avi','Avisos'],['ped','Pedidos'],['rel','Relatório']];
+ app.innerHTML=`<div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('tab',n,`data-t="${k}"`,tab==k?'on':'')).join('')}</div><div id="tb"></div>`;
+ await({loja:tLoja,prod:tProd,cup:tCup,vale:tVale,avi:tAvi,ped:tPed,rel:tRel})[tab]();
+}
+function tLoja(){
+ const l=eu.loja,link=location.origin+'/?loja='+l.slug;
+ $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('wa','Seu WhatsApp (com DDD)',l.whatsapp,'inputmode="tel"')}${inp('px','Chave Pix',l.pix)}<div class="err" id="er"></div>${bt('salvarloja','Salvar','','p')}</div>
+ <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}<a href="https://wa.me/?text=${encodeURIComponent('Conheça a minha loja: '+link)}" target="_blank" rel="noopener"><button style="width:100%">Enviar no WhatsApp</button></a></div></div>`;
+}
+async function tProd(){
+ const l=await api('/api/vendedor/produtos');
+ $('#tb').innerHTML=`<div class="box"><h3 style="margin-top:0">Adicionar produto</h3><label>Classe</label><select id="cl">${Object.keys(NEED).map(k=>`<option value="${k}">${CL[k]}</option>`).join('')}</select><div id="ex"></div><label>Descrição</label><textarea id="d" rows="2"></textarea>${inp('pr','Preço (R$)','','inputmode="decimal"')}${inp('es','Quantidade em estoque','1','type="number" min="1"')}<label>Foto</label><input id="ft" type="file" accept="image/*"><div class="err" id="er"></div>${bt('addprod','Adicionar','','p')}</div><div class="grid">${l.map(p=>card(p,1)).join('')}</div>`;
+ const ex=()=>{const n=NEED[$('#cl').value];$('#ex').innerHTML=(n.includes('nome')?inp('nm','Nome do produto'):'')+(n.includes('tam')?inp('tm','Tamanho'):'')};ex();$('#cl').onchange=ex;
+}
+async function tCup(){
+ const l=await api('/api/vendedor/cupons');
+ $('#tb').innerHTML=`<div class="box" style="max-width:420px"><h3 style="margin-top:0">Novo cupom</h3>${inp('cc','Código (ex: KIVRA10)')}<label>Tipo</label><select id="ct"><option value="percentual">Porcentagem (%) — máximo 50</option><option value="valor">Valor em R$ (limitado a 50% do preço)</option></select>${inp('cv','Valor','','inputmode="decimal"')}<div class="err" id="er"></div>${bt('addcup','Criar cupom','','p')}</div>`+
+ l.map(c=>`<div class="box row" style="align-items:center"><div><b>${esc(c.codigo)}</b> · ${c.tipo=='percentual'?c.valor+'%':brl(c.valor)}</div>${bt('delcup','Excluir',`data-id="${c.id}"`)}</div>`).join('');
+}
+async function tVale(){
+ const l=await api('/api/vendedor/vales');
+ $('#tb').innerHTML=`<div class="box" style="max-width:420px"><h3 style="margin-top:0">Emitir vale presente</h3><select id="vv">${[10,30,50,70,100,200,250,300,400,500].map(v=>`<option value="${v}">R$ ${v}</option>`).join('')}</select><div class="err" id="er"></div>${bt('addvale','Emitir vale','','p')}</div>`+
+ l.map(v=>`<div class="box"><b>${esc(v.codigo)}</b> · ${brl(v.valor)} <span class="tag">${v.usado?'usado':'disponível'}</span><br><span class="mut">${dt(v.criado)}</span></div>`).join('');
+}
+function tAvi(){
+ $('#tb').innerHTML=`<div class="box" style="max-width:480px"><h3 style="margin-top:0">Aviso na página inicial</h3><label>Tipo</label><select id="at"><option value="promocao">Promoção</option><option value="estoque">Atualização de estoque</option></select>${inp('ati','Título')}<label>Texto</label><textarea id="atx" rows="3"></textarea><div class="err" id="er"></div>${bt('addavi','Publicar','','p')}</div>`;
+}
+async function tPed(){
+ const o=await api('/api/vendedor/pedidos?ordem='+ord);
+ $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 Venda: ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${x.metodo}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · <a href="https://wa.me/55${x.telefone.replace(/^55/,'')}" target="_blank" rel="noopener">${esc(x.telefone)}</a><br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)} · CEP ${esc(x.cep)}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:''}</div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
+ $('#od').value=ord;
+}
+async function tRel(){$('#tb').innerHTML=relTab(await api('/api/vendedor/relatorio'))}
+const relTab=r=>`<div class="box sc"><table><tr><th>Período</th><th>Vendas</th><th>Total</th></tr>${[['mes','Mês'],['bimestre','Bimestre'],['trimestre','Trimestre'],['ano','Ano']].map(([k,n])=>`<tr><td>${n}</td><td>${r[k].vendas}</td><td>${brl(r[k].total)}</td></tr>`).join('')}</table></div>`;
+
+/* ---------- ADM ---------- */
+async function vAdm(){
+ const [u,r]=await Promise.all([api('/api/admin/usuarios'),api('/api/admin/relatorio')]);
+ app.innerHTML=`<h3>Relatório de vendas (todas as lojas)</h3>${relTab(r)}<h3>Usuários</h3><div class="sc box"><table><tr><th>E-mail</th><th>Tipo</th><th>Loja</th><th></th></tr>${u.map(x=>`<tr><td>${esc(x.email)}</td><td>${x.papel}${x.bloqueado?' 🚫':''}</td><td>${esc(x.loja||'')}</td><td>${x.papel=='admin'?'':bt('bloq',x.bloqueado?'Desbloquear':'Bloquear',`data-id="${x.id}" data-b="${x.bloqueado?0:1}"`)+' '+bt('deluser','Excluir',`data-id="${x.id}"`)}</td></tr>`).join('')}</table></div>`;
+}
+
+/* ---------- ações (um clique = uma função) ---------- */
+const A={
+ go:d=>go(d.v,d.a),
+ pass:d=>slide(sl+Number(d.n)),
+ dot:d=>slide(Number(d.i)),
+ pausa:(d,t)=>{pausa=!pausa;t.textContent=pausa?'▶':'⏸'},
+ instalar:()=>{if(dp){dp.prompt();dp=null}else alert('Para instalar: no iPhone, toque em Compartilhar e depois em "Adicionar à Tela de Início". No Android ou no Windows, abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".')},
+ buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};draw()},
+ buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return go('conta')}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id},d.m)},
+ vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return go('conta')}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)},'pix')},
+ fechar:()=>$('#mod').innerHTML='',
+ zoom:(d,t)=>{$('#mod').innerHTML=`<div class="modal"><div><img src="${t.src}" style="width:100%"><br><br><button data-x="fechar" style="width:100%">Fechar</button></div></div>`},
+ enviar:async()=>{
+  const {it,m}=cur,f=$('#f_co').files[0];
+  const r=await api('/api/pedidos','POST',{produto_id:it.id,loja_id:it.loja_id,vale_valor:it.vale,metodo:m,nome:val('f_n'),cep:val('f_cep'),cidade:val('f_ci'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu'),telefone:val('f_te'),cupom:val('f_cu'),vale_codigo:val('f_va'),comprovante:f?await img(f,900):null});
+  const w=digits(r.whatsapp),msg=encodeURIComponent(`Olá! Fiz um pedido: ${it.nome} (${brl(r.total)}) via ${m}.`);
+  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido enviado ✅</h3><p>Total: <b>${brl(r.total)}</b>. Combine a entrega ou retirada pelo WhatsApp.</p>${m=='pix'&&r.pix?`<p>Chave Pix: <b>${esc(r.pix)}</b></p>`:''}${w?`<a href="https://wa.me/55${w.replace(/^55/,'')}?text=${msg}" target="_blank" rel="noopener"><button class="p" style="width:100%">Falar com o vendedor</button></a><br><br>`:''}<button data-x="fechar" style="width:100%">Fechar</button></div></div>`;
+ },
+ modo:d=>{modo=d.m;vConta()},
+ conta:async()=>{
+  if(modo=='entrar')await api('/api/login','POST',{email:val('e'),senha:$('#s').value});
+  else await api('/api/cadastro','POST',{email:val('e'),senha:$('#s').value,confirmar:$('#s2').value,tipo:modo=='vend'?'vendedor':'cliente',cpf:val('cpf'),nomeLoja:val('nl')});
+  eu=await api('/api/eu');go(eu.papel=='vendedor'?'vend':eu.papel=='admin'?'adm':'inicio');
+ },
+ sair:async()=>{await api('/api/logout','POST');eu={logado:false};go('inicio')},
+ tab:d=>{tab=d.t;vVend()},
+ salvarloja:async()=>{await api('/api/vendedor/loja','PUT',{nome:val('ln'),quem_somos:$('#qs').value,whatsapp:val('wa'),pix:val('px')});eu=await api('/api/eu');$('#er').textContent='Salvo ✔'},
+ copiar:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Link copiado!')}catch(e){prompt('Copie o link:',d.l)}},
+ addprod:async()=>{const f=$('#ft').files[0];if(!f)throw new Error('Adicione a foto.');await api('/api/vendedor/produtos','POST',{classe:val('cl'),nome:val('nm'),tamanho:val('tm'),descricao:val('d'),preco:parseFloat(val('pr').replace(',','.')),estoque:val('es'),foto:await img(f)});tProd()},
+ estoque:async d=>{await api(`/api/vendedor/produtos/${d.id}/estoque`,'PUT',{estoque:$('#e'+d.id).value});tProd()},
+ delprod:async d=>{if(confirm('Excluir produto?')){await api('/api/vendedor/produtos/'+d.id,'DELETE');tProd()}},
+ addcup:async()=>{await api('/api/vendedor/cupons','POST',{codigo:val('cc'),tipo:val('ct'),valor:val('cv').replace(',','.')});tCup()},
+ delcup:async d=>{await api('/api/vendedor/cupons/'+d.id,'DELETE');tCup()},
+ addvale:async()=>{const r=await api('/api/vendedor/vales','POST',{valor:val('vv')});alert('Vale emitido! Código: '+r.codigo);tVale()},
+ addavi:async()=>{await api('/api/vendedor/avisos','POST',{tipo:val('at'),titulo:val('ati'),texto:$('#atx').value});$('#er').textContent='Publicado ✔'},
+ bloq:async d=>{await api(`/api/admin/usuarios/${d.id}/bloqueio`,'POST',{bloqueado:d.b=='1'});vAdm()},
+ deluser:async d=>{if(confirm('Excluir este usuário e os dados dele?')){await api('/api/admin/usuarios/'+d.id,'DELETE');vAdm()}},
+};
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
+ try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
+document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
+init();
+</script></body></html>
