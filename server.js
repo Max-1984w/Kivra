@@ -38,7 +38,10 @@ async function criarTabelas() {
     item TEXT, preco_original DOUBLE PRECISION, desconto DOUBLE PRECISION, preco DOUBLE PRECISION, cupom TEXT, metodo TEXT,
     nome TEXT, cep TEXT, cidade TEXT, bairro TEXT, rua TEXT, numero TEXT, telefone TEXT, comprovante TEXT, criado BIGINT);
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS avatar TEXT;
-  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS banner TEXT;`);
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS banner TEXT;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendente';
+  CREATE TABLE IF NOT EXISTS mensagens(id SERIAL PRIMARY KEY, pedido_id INTEGER, autor_id INTEGER, texto TEXT, criado BIGINT);
+  CREATE INDEX IF NOT EXISTS idx_msg_pedido ON mensagens(pedido_id);`);
 }
 
 // ---------- REGRAS ----------
@@ -197,8 +200,8 @@ async function relatorio(lojaId) {
   const out = {};
   for (const [k, t] of Object.entries(ini)) {
     const r = lojaId
-      ? await get('SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS total FROM pedidos WHERE loja_id=? AND criado>=?', lojaId, +t)
-      : await get('SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS total FROM pedidos WHERE criado>=?', +t);
+      ? await get('SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS total FROM pedidos WHERE status=\'aprovado\' AND loja_id=? AND criado>=?', lojaId, +t)
+      : await get('SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS total FROM pedidos WHERE status=\'aprovado\' AND criado>=?', +t);
     out[k] = { vendas: r.n, total: r.total };
   }
   return out;
@@ -221,8 +224,7 @@ app.post('/api/pedidos', logado, async (req, res) => {
   if (!txt(b.nome) || !txt(b.cidade) || !txt(b.bairro) || !txt(b.rua) || !txt(b.numero)) return res.status(400).json({ erro: 'Preencha todos os campos.' });
   if (digits(b.cep).length !== 8) return res.status(400).json({ erro: 'CEP inválido.' });
   if (digits(b.telefone).length < 10) return res.status(400).json({ erro: 'Telefone inválido (DDD + número).' });
-  if (!['pix', 'cartao'].includes(b.metodo)) return res.status(400).json({ erro: 'Forma de pagamento inválida.' });
-  if (b.metodo === 'pix' && !ehImagem(b.comprovante)) return res.status(400).json({ erro: 'Anexe o comprovante do Pix.' });
+  if (!['pix', 'credito', 'debito'].includes(b.metodo)) return res.status(400).json({ erro: 'Forma de pagamento inválida.' });
 
   let desconto = 0, cupom = null;
   if (txt(b.cupom) && produto_id) {
@@ -237,17 +239,69 @@ app.post('/api/pedidos', logado, async (req, res) => {
     desconto += Math.min(vale.valor, preco - desconto);
   }
   const final = Math.max(preco - desconto, 0);
-  await run(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,telefone,comprovante,criado)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  const ped = await get(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,telefone,comprovante,criado)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
     loja_id, req.u.id, req.ip, produto_id, item, preco, desconto, final, cupom, b.metodo, txt(b.nome), digits(b.cep),
     txt(b.cidade), txt(b.bairro), txt(b.rua), txt(b.numero), digits(b.telefone), ehImagem(b.comprovante) ? b.comprovante : null, Date.now());
   if (produto_id) await run('UPDATE produtos SET estoque=estoque-1 WHERE id=?', produto_id);
   if (vale) await run('UPDATE vales SET usado=1 WHERE id=?', vale.id);
   const l = await get('SELECT whatsapp,pix FROM lojas WHERE id=?', loja_id);
-  res.json({ ok: true, total: final, whatsapp: l.whatsapp, pix: l.pix });
+  res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix });
 });
 app.get('/api/meus-pedidos', logado, async (req, res) =>
-  res.json(await all('SELECT id,item,preco,metodo,criado FROM pedidos WHERE usuario_id=? ORDER BY criado DESC', req.u.id)));
+  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,l.nome AS loja_nome
+                      FROM pedidos p LEFT JOIN lojas l ON l.id=p.loja_id WHERE p.usuario_id=? ORDER BY p.criado DESC`, req.u.id)));
+
+// ---------- COMPROVANTE, APROVAÇÃO E CHAT ----------
+async function acessoPedido(req, res) {   // só o comprador e o vendedor da loja enxergam o pedido
+  const p = await get('SELECT * FROM pedidos WHERE id=?', req.params.id);
+  if (p) {
+    if (req.u.id === p.usuario_id) return p;
+    if (req.u.papel === 'vendedor') {
+      const l = await get('SELECT id FROM lojas WHERE usuario_id=?', req.u.id);
+      if (l && l.id === p.loja_id) return p;
+    }
+  }
+  res.status(404).json({ erro: 'Pedido não encontrado.' }); return null;
+}
+app.put('/api/pedidos/:id/comprovante', logado, async (req, res) => {
+  const p = await get('SELECT * FROM pedidos WHERE id=? AND usuario_id=?', req.params.id, req.u.id);
+  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido pelo vendedor.' });
+  if (!ehImagem(req.body.comprovante)) return res.status(400).json({ erro: 'Anexe a foto do comprovante.' });
+  await run('UPDATE pedidos SET comprovante=? WHERE id=?', req.body.comprovante, p.id);
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, '📎 Enviei o comprovante do Pix.', Date.now());
+  res.json({ ok: true });
+});
+app.get('/api/pedidos/:id/mensagens', logado, async (req, res) => {
+  const p = await acessoPedido(req, res); if (!p) return;
+  const m = await all('SELECT id,autor_id,texto,criado FROM mensagens WHERE pedido_id=? ORDER BY id', p.id);
+  res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
+});
+app.post('/api/pedidos/:id/mensagens', logado, async (req, res) => {
+  const p = await acessoPedido(req, res); if (!p) return;
+  const texto = txt(req.body.texto).slice(0, 1000);
+  if (!texto) return res.status(400).json({ erro: 'Escreva uma mensagem.' });
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, texto, Date.now());
+  res.json({ ok: true });
+});
+app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
+  const p = await get('SELECT * FROM pedidos WHERE id=? AND loja_id=?', req.params.id, req.loja.id);
+  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido.' });
+  const st = req.body.status;
+  if (!['aprovado', 'recusado'].includes(st)) return res.status(400).json({ erro: 'Status inválido.' });
+  await run('UPDATE pedidos SET status=? WHERE id=?', st, p.id);
+  let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
+  if (st === 'recusado' && p.produto_id) await run('UPDATE produtos SET estoque=estoque+1 WHERE id=?', p.produto_id);
+  if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
+    const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    await run('INSERT INTO vales(loja_id,codigo,valor,criado) VALUES(?,?,?,?)', req.loja.id, codigo, p.preco_original, Date.now());
+    msg += ` Código do seu vale presente: ${codigo}`;
+  }
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, msg, Date.now());
+  res.json({ ok: true });
+});
 
 // ---------- PAINEL ADM ----------
 app.get('/api/admin/usuarios', admin, async (req, res) =>
