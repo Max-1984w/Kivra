@@ -56,6 +56,7 @@ const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const brl=v=>'R$ '+Number(v).toFixed(2).replace('.',',');
 const digits=s=>String(s||'').replace(/\D/g,'');
 const dt=t=>new Date(t).toLocaleString('pt-BR');
+const MET={pix:'Pix',credito:'Cartão de crédito',debito:'Cartão de débito',cartao:'Cartão'},ST={pendente:'⏳ Aguardando',aprovado:'✅ Aprovado',recusado:'❌ Recusado'};
 const val=i=>$('#'+i)?.value.trim();
 async function api(u,m='GET',b){
  const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
@@ -65,7 +66,7 @@ function img(file,max=700){return new Promise((ok,no)=>{const r=new FileReader()
 const inp=(id,l,v='',a='')=>`<label>${l}</label><input id="${id}" value="${esc(v)}" ${a}>`;
 const bt=(x,t,d='',c='')=>`<button class="${c}" data-x="${x}" ${d}>${t}</button>`;
 
-let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null,ar='cliente';
+let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null,ar='cliente',ct=null,loadMsgs=null;
 function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
 function nav(){
  const b=(v,t)=>`<button data-x="go" data-v="${v}" class="${view==v?'on':''}">${t}</button>`;
@@ -77,7 +78,7 @@ async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus
 async function init(){try{eu=await api('/api/eu')}catch(e){}const l=new URLSearchParams(location.search).get('loja');l?go('loja',l):go('inicio')}
 
 /* ---------- vitrine ---------- */
-function card(p,del){P[p.id]=p;return `<div class="card"><img src="${p.foto}" alt=""><div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`<div class="row">${bt('buy','Pagar via Pix',`data-id="${p.id}" data-m="pix"`,'p')}${bt('buy','Pagar via cartão',`data-id="${p.id}" data-m="cartao"`,'p')}</div>`}</div></div>`}
+function card(p,del){P[p.id]=p;return `<div class="card"><img src="${p.foto}" alt=""><div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
 let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
 function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
@@ -120,13 +121,28 @@ async function vLoja(){
 }
 async function vMeus(){
  const o=await api('/api/meus-pedidos');
- app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${x.metodo}</span><br><span class="mut">${dt(x.criado)}</span></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
+ app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span><br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
 }
-function pedido(it,m){
- cur={it,m};
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Finalizar pedido</h3><div class="mut">${esc(it.nome)} · ${brl(it.preco)} · ${m=='pix'?'Pix':'Cartão'}</div><br>${inp('f_n','Nome completo')}${inp('f_cep','CEP','','inputmode="numeric" maxlength="9"')}${inp('f_ci','Cidade')}${inp('f_ba','Bairro')}${inp('f_ru','Rua')}${inp('f_nu','Número da casa')}${inp('f_te','Telefone com DDD','','inputmode="tel"')}
+function pedido(it){
+ cur={it};
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Finalizar pedido</h3><div class="mut">${esc(it.nome)} · ${brl(it.preco)}</div><br><label>Forma de pagamento</label><select id="f_m"><option value="pix">Pix</option><option value="credito">Cartão de crédito</option><option value="debito">Cartão de débito</option></select>${inp('f_n','Nome completo')}${inp('f_cep','CEP','','inputmode="numeric" maxlength="9"')}${inp('f_ci','Cidade')}${inp('f_ba','Bairro')}${inp('f_ru','Rua')}${inp('f_nu','Número da casa')}${inp('f_te','Telefone com DDD','','inputmode="tel"')}
  ${it.vale?'':inp('f_cu','Cupom de desconto (opcional)')+inp('f_va','Código do vale presente (opcional)')}
- <label>Foto do comprovante${m=='pix'?'':' (opcional)'}</label><input id="f_co" type="file" accept="image/*"><div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('enviar','Enviar pedido','','p')}</div></div></div>`;
+ <div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('enviar','Continuar','','p')}</div></div></div>`;
+}
+function fin(r,it,m){
+ cur.pid=r.id;const w=digits(r.whatsapp),zap=w?`https://wa.me/55${w.replace(/^55/,'')}?text=${encodeURIComponent(`Olá! Fiz o pedido #${r.id}: ${it.nome} (${brl(r.total)}).`)}`:'';
+ const pg=m=='pix'?(r.pix?`<div class="box"><div class="mut">Chave Pix do vendedor</div><div style="font-size:18px;font-weight:700;word-break:break-all;margin:6px 0">${esc(r.pix)}</div>${bt('copiarpix','Copiar chave',`data-l="${esc(r.pix)}"`,'p')}</div><label>Depois de pagar, anexe a foto do comprovante</label><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div>${bt('comp','Enviar comprovante',`data-id="${r.id}"`,'p')}`:'<div class="box">O vendedor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</div>')
+  :`<div class="box"><b>Pagamento no cartão de ${m=='credito'?'crédito':'débito'}</b><p>Entre em contato com o vendedor para acertar o pagamento. Quando vocês combinarem, ele aprova o seu pedido.</p></div>`;
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}${zap?`<a href="${zap}" target="_blank" rel="noopener"><button style="width:100%">WhatsApp</button></a>`:''}</div><p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
+}
+async function chat(id,tit){
+ clearInterval(ct);
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">💬 ${esc(tit)}</h3><div id="msgs" style="height:300px;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"></div><div class="row"><input id="mt" placeholder="Escreva uma mensagem" maxlength="1000" style="margin:0;flex:4">${bt('msg','Enviar',`data-id="${id}"`,'p')}</div><br>${bt('fechar','Fechar')}</div></div>`;
+ loadMsgs=async()=>{const m=await api(`/api/pedidos/${id}/mensagens`),el=$('#msgs');if(!el){clearInterval(ct);return}
+  const fim=el.scrollTop+el.clientHeight>=el.scrollHeight-30;
+  el.innerHTML=m.mensagens.map(x=>`<div style="text-align:${x.minha?'right':'left'};margin:6px 0"><span style="display:inline-block;max-width:85%;padding:6px 10px;border-radius:12px;background:${x.minha?'var(--ac)':'var(--card)'};color:${x.minha?'#fff':'var(--fg)'};text-align:left;white-space:pre-wrap;word-break:break-word">${esc(x.texto)}</span><div class="mut" style="font-size:11px">${dt(x.criado)}</div></div>`).join('')||'<p class="mut">Nenhuma mensagem ainda. Diga olá!</p>';
+  if(fim)el.scrollTop=el.scrollHeight};
+ await loadMsgs();$('#msgs').scrollTop=1e9;ct=setInterval(()=>loadMsgs().catch(()=>{}),4000);
 }
 
 /* ---------- conta ---------- */
@@ -172,7 +188,7 @@ function tAvi(){
 }
 async function tPed(){
  const o=await api('/api/vendedor/pedidos?ordem='+ord);
- $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 Venda: ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${x.metodo}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · <a href="https://wa.me/55${x.telefone.replace(/^55/,'')}" target="_blank" rel="noopener">${esc(x.telefone)}</a><br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)} · CEP ${esc(x.cep)}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:''}</div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
+ $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · <a href="https://wa.me/55${x.telefone.replace(/^55/,'')}" target="_blank" rel="noopener">${esc(x.telefone)}</a><br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)} · CEP ${esc(x.cep)}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
  $('#od').value=ord;
 }
 async function tRel(){$('#tb').innerHTML=relTab(await api('/api/vendedor/relatorio'))}
@@ -193,15 +209,20 @@ const A={
  pausa:(d,t)=>{pausa=!pausa;t.textContent=pausa?'▶':'⏸'},
  instalar:()=>{if(dp){dp.prompt();dp=null}else alert('Para instalar: no iPhone, toque em Compartilhar e depois em "Adicionar à Tela de Início". No Android ou no Windows, abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".')},
  buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};draw()},
- buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id},d.m)},
- vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)},'pix')},
- fechar:()=>$('#mod').innerHTML='',
+ buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id})},
+ vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)})},
+ chat:d=>chat(d.id,d.t),
+ msg:async d=>{const t=val('mt');if(!t)return;await api(`/api/pedidos/${d.id}/mensagens`,'POST',{texto:t});$('#mt').value='';await loadMsgs()},
+ copiarpix:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Chave Pix copiada!')}catch(e){prompt('Copie a chave Pix:',d.l)}},
+ comp:async d=>{const f=$('#cp')?.files[0];if(!f)throw new Error('Escolha a foto do comprovante.');await api(`/api/pedidos/${d.id}/comprovante`,'PUT',{comprovante:await img(f,900)});alert('Comprovante enviado! O vendedor vai conferir e aprovar o seu pedido.');if(view=='meus'){A.fechar();vMeus()}else $('#cp').value=''},
+ compmodal:d=>{$('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Comprovante do Pix</h3><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('comp','Enviar',`data-id="${d.id}"`,'p')}</div></div></div>`},
+ status:async d=>{if(!confirm(d.s=='aprovado'?'Aprovar este pedido?':'Recusar este pedido?'))return;await api(`/api/vendedor/pedidos/${d.id}/status`,'POST',{status:d.s});tPed()},
+ fechar:()=>{clearInterval(ct);$('#mod').innerHTML=''},
  zoom:(d,t)=>{$('#mod').innerHTML=`<div class="modal"><div><img src="${t.src}" style="width:100%"><br><br><button data-x="fechar" style="width:100%">Fechar</button></div></div>`},
  enviar:async()=>{
-  const {it,m}=cur,f=$('#f_co').files[0];
-  const r=await api('/api/pedidos','POST',{produto_id:it.id,loja_id:it.loja_id,vale_valor:it.vale,metodo:m,nome:val('f_n'),cep:val('f_cep'),cidade:val('f_ci'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu'),telefone:val('f_te'),cupom:val('f_cu'),vale_codigo:val('f_va'),comprovante:f?await img(f,900):null});
-  const w=digits(r.whatsapp),msg=encodeURIComponent(`Olá! Fiz um pedido: ${it.nome} (${brl(r.total)}) via ${m}.`);
-  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido enviado ✅</h3><p>Total: <b>${brl(r.total)}</b>. Combine a entrega ou retirada pelo WhatsApp.</p>${m=='pix'&&r.pix?`<p>Chave Pix: <b>${esc(r.pix)}</b></p>`:''}${w?`<a href="https://wa.me/55${w.replace(/^55/,'')}?text=${msg}" target="_blank" rel="noopener"><button class="p" style="width:100%">Falar com o vendedor</button></a><br><br>`:''}<button data-x="fechar" style="width:100%">Fechar</button></div></div>`;
+  const {it}=cur,m=val('f_m');
+  const r=await api('/api/pedidos','POST',{produto_id:it.id,loja_id:it.loja_id,vale_valor:it.vale,metodo:m,nome:val('f_n'),cep:val('f_cep'),cidade:val('f_ci'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu'),telefone:val('f_te'),cupom:val('f_cu'),vale_codigo:val('f_va')});
+  fin(r,it,m);
  },
  modo:d=>{modo=d.m;vConta()},
  conta:async()=>{
@@ -226,6 +247,7 @@ const A={
 };
 document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
  try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
+document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
 document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
 init();
 </script></body></html>
