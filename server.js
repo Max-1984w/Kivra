@@ -1,231 +1,281 @@
-<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kivra</title>
-<style>
-:root{color-scheme:dark;--bg:#0c0c0e;--fg:#f4f1f3;--mut:#a89aa2;--card:#17171a;--bd:#2c2429;--ac:#a8124f;--ac2:#ee5a96}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
-a{color:var(--ac)}
-.aviso{background:var(--ac);color:#fff;text-align:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;font-weight:600;font-size:14px}
-nav{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
-button,select,input,textarea{font:inherit;color:var(--fg)}
-button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;cursor:pointer}
-button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.on{border-color:var(--ac);color:var(--ac)}
-main{max-width:980px;margin:0 auto;padding:16px}
-input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:9px;margin:4px 0 10px}
-label{font-size:13px;color:var(--mut)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
-.card img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
-.card .b{padding:10px;display:flex;flex-direction:column;gap:6px;flex:1}
-.pr{font-weight:700;font-size:18px}.mut{color:var(--mut);font-size:13px}
-.row{display:flex;gap:6px;flex-wrap:wrap}.row>*{flex:1}
-.box{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
-.modal{position:fixed;inset:0;background:#0008;display:flex;justify-content:center;overflow:auto;padding:16px}
-.modal>div{background:var(--bg);border-radius:12px;padding:16px;max-width:460px;width:100%;margin:auto}
-.err{color:#d33;font-size:13px;min-height:16px}
-.tag{display:inline-block;font-size:12px;background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:1px 8px}
-.vale{font-size:20px;font-weight:700;padding:16px 8px}
-table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
-.sc{overflow-x:auto}
-.ban{height:clamp(120px,28vw,240px);border-radius:14px;background:linear-gradient(120deg,#3d0820,#a8124f) center/cover;border:1px solid var(--bd)}
-.perfil{display:flex;gap:14px;align-items:flex-end;margin:-44px 16px 14px;position:relative}
-.av{width:96px;height:96px;flex:0 0 96px;border-radius:50%;border:4px solid var(--bg);object-fit:cover;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:800}
-a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
-.hero{position:relative;border-radius:14px;overflow:hidden;min-height:400px;color:#fff;background:radial-gradient(ellipse at 50% 35%,#7d1040,#0c0c0e 72%);border:1px solid var(--bd)}
-.sl{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 64px 56px;gap:12px}
-.sl.on{display:flex}
-.k{letter-spacing:.3em;font-size:13px;color:#f3c1d6}
-.h{font-size:clamp(34px,8vw,64px);font-weight:800;line-height:1.05}
-.cp{border:1px solid #f3c1d666;border-radius:12px;padding:10px 22px;max-width:440px}
-.hb{background:#fff;color:#111;border:0;font-weight:700;letter-spacing:.08em;padding:12px 28px}
-.ar{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:#ffffff33;border:0;color:#fff;font-size:20px;padding:0;z-index:2}
-.ctl{position:absolute;left:16px;bottom:14px;display:flex;gap:8px;align-items:center;z-index:2}
-.dt{width:8px;height:8px;border-radius:50%;background:#fff6;padding:0;border:0}.dt.on{width:28px;border-radius:6px;background:#fff}
-.ps{width:28px;height:28px;border-radius:50%;background:#ffffff33;border:0;color:#fff;padding:0;font-size:12px}
-.app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#3d0820,#a8124f);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
-.app button{background:#fff;color:#111;border:0;font-weight:700}
-</style></head><body>
-<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo watzzap, compras feitas para fora do pais não seram reembolsadas</div>
-<nav id="nav"></nav><main id="app"></main><div id="mod"></div>
-<script>
-const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',vale_presente:'Vale presente'};
-const NEED={roupas:['tam'],calcados:['tam'],bolsas:[],perfumes:['nome'],cosmeticos:['nome']};
-const $=s=>document.querySelector(s),app=$('#app');
-const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const brl=v=>'R$ '+Number(v).toFixed(2).replace('.',',');
-const digits=s=>String(s||'').replace(/\D/g,'');
-const dt=t=>new Date(t).toLocaleString('pt-BR');
-const val=i=>$('#'+i)?.value.trim();
-async function api(u,m='GET',b){
- const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
- let d={};try{d=await r.json()}catch(e){}
- if(!r.ok)throw new Error(d.erro||'Erro no servidor ('+r.status+')');return d}
-function img(file,max=700){return new Promise((ok,no)=>{const r=new FileReader();r.onerror=no;r.onload=()=>{const i=new Image();i.onerror=no;i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.7))};i.src=r.result};r.readAsDataURL(file)})}
-const inp=(id,l,v='',a='')=>`<label>${l}</label><input id="${id}" value="${esc(v)}" ${a}>`;
-const bt=(x,t,d='',c='')=>`<button class="${c}" data-x="${x}" ${d}>${t}</button>`;
+require('express-async-errors'); // faz erros dentro de rotas async virarem resposta de erro
+const express = require('express');
+const session = require('express-session');
+const PgSession = require('connect-pg-simple')(session);
+const bcrypt = require('bcryptjs');
+const { Pool, types } = require('pg');
+const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 
-let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null,ar='cliente';
-function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
-function nav(){
- const b=(v,t)=>`<button data-x="go" data-v="${v}" class="${view==v?'on':''}">${t}</button>`;
- $('#nav').innerHTML=b('inicio','🏠 Início')+b('prod','🔎 Produtos')+(eu.logado?b('meus','Meus pedidos'):'')+
-  (eu.papel=='vendedor'?b('vend','🏪 Minha loja'):'')+(eu.papel=='admin'?b('adm','🛡️ ADM'):'')+
-  (eu.logado?bt('sair','Sair'):bt('area','Entrar / Criar conta','data-ar="cliente"')+bt('area','🏪 Área do vendedor','data-ar="vendedor"','p'));
-}
-async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
-async function init(){try{eu=await api('/api/eu')}catch(e){}const l=new URLSearchParams(location.search).get('loja');l?go('loja',l):go('inicio')}
+// ---------- CONFIGURAÇÃO (vem das "variáveis de ambiente" do Render) ----------
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase();
+if (!process.env.DATABASE_URL) { console.error('ERRO: falta a variável DATABASE_URL (endereço do Supabase).'); process.exit(1); }
+if (!ADMIN_EMAIL) console.warn('AVISO: ADMIN_EMAIL não definido; ninguém terá acesso ao painel de ADM.');
 
-/* ---------- vitrine ---------- */
-function card(p,del){P[p.id]=p;return `<div class="card"><img src="${p.foto}" alt=""><div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`<div class="row">${bt('buy','Pagar via Pix',`data-id="${p.id}" data-m="pix"`,'p')}${bt('buy','Pagar via cartão',`data-id="${p.id}" data-m="cartao"`,'p')}</div>`}</div></div>`}
-let sl=0,tm=null,pausa=false,dp=null;
-addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
-function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
-async function vInicio(){
- const [av,lj]=await Promise.all([api('/api/inicio'),api('/api/lojas')]);
- const S=[{k:'ROUPAS • CALÇADOS • BOLSAS • PERFUMES',s:'COSMÉTICOS • VALE PRESENTE',h:'Kivra',c:'Compre direto das melhores lojas',b:'COMPRAR',v:'prod'},
-  ...av.filter(a=>a.tipo=='promocao').slice(0,5).map(a=>({k:a.loja_nome.toUpperCase(),s:'PROMOÇÃO',h:a.titulo,c:a.texto,b:'VER LOJA',v:'loja',a:a.slug}))];
- const es=av.filter(a=>a.tipo=='estoque');
- sl=0;
- app.innerHTML=`<div class="hero">${S.map((x,i)=>`<div class="sl ${i?'':'on'}"><div class="k">${esc(x.k)}</div><div class="k">${esc(x.s)}</div><div class="h">${esc(x.h)}</div>${x.c?`<div class="cp">${esc(x.c)}</div>`:''}<button class="hb" data-x="go" data-v="${x.v}" ${x.a?`data-a="${x.a}"`:''}>${x.b}</button></div>`).join('')}
- ${S.length>1?`<button class="ar" style="left:12px" data-x="pass" data-n="-1">‹</button><button class="ar" style="right:12px" data-x="pass" data-n="1">›</button>`:''}
- <div class="ctl">${S.map((x,i)=>`<button class="dt ${i?'':'on'}" data-x="dot" data-i="${i}"></button>`).join('')}<button class="ps" data-x="pausa">⏸</button></div></div>
- <div class="app"><div><b>Instale o app Kivra</b><div style="opacity:.85">Tenha tudo em um só lugar, no computador ou no celular.</div></div><button data-x="instalar">Instalar</button></div>
- ${lj.length?`<h3>Lojas</h3><div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}
- ${es.length?`<h3>Atualizações de estoque</h3>`+es.map(a=>`<div class="box"><span class="tag">📦 Estoque</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):''}`;
- clearInterval(tm);tm=setInterval(()=>{if(!pausa&&view=='inicio')slide(sl+1)},5000);
-}
-async function vInicioOld(){
- const [av,lj]=await Promise.all([api('/api/inicio'),api('/api/lojas')]);
- app.innerHTML=`<h1 style="margin:6px 0">Kivra</h1><p class="mut">Promoções, atualizações de estoque e lojas parceiras.</p>${lj.length?`<div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}`+
- (av.length?av.map(a=>`<div class="box"><span class="tag">${a.tipo=='estoque'?'📦 Estoque':'🏷️ Promoção'}</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):'<p class="mut">Ainda não há novidades.</p>');
-}
-async function vProd(){
- const sel=Object.entries(CL).map(([k,n])=>`<option value="${k}" ${Q.classe==k?'selected':''}>${n}</option>`).join('');
- let lista='';
- if(Q.classe=='vale_presente'){const lj=await api('/api/lojas');lista=`<p class="mut">Escolha a loja para comprar o vale presente:</p><div class="row">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`}
- else{const l=await api('/api/produtos?'+new URLSearchParams(Q));lista=l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="mut">Nenhum produto encontrado.</p>'}
- app.innerHTML=`<div class="box"><label>Pesquisar</label><input id="q" value="${esc(Q.q)}" placeholder="Nome ou descrição"><div class="row"><div><label>Classe</label><select id="cl"><option value="">Todas</option>${sel}</select></div><div><label>Preço mínimo</label><input id="mn" inputmode="decimal" value="${esc(Q.min)}"></div><div><label>Preço máximo</label><input id="mx" inputmode="decimal" value="${esc(Q.max)}"></div></div>${bt('buscar','Buscar','','p')}</div>`+lista;
-}
-let lt='inicio';
-async function vLoja(){
- const [l,ps]=await Promise.all([api('/api/lojas/'+arg),api('/api/produtos?loja='+arg)]);
- const w=digits(l.whatsapp),f=l.faixa_preco||{},zap=w?`https://wa.me/55${w.replace(/^55/,'')}`:'';
- const wa=zap?`<a href="${zap}" target="_blank" rel="noopener"><button style="width:100%">Não achou o valor que queria? mande uma mensagem para ${esc(l.whatsapp)}</button></a>`:'<p class="mut">Não achou o valor que queria? O vendedor ainda não cadastrou o WhatsApp.</p>';
- const T=[['inicio','Início'],['prod','Produtos ('+ps.length+')'],['vale','Vale presente']];
- const grade=a=>a.length?`<div class="grid">${a.map(p=>card(p)).join('')}</div>`:'<p class="mut">Sem produtos no momento.</p>';
- const body=lt=='prod'?grade(ps):lt=='vale'?`<div class="grid">${l.vales.map(v=>`<button class="vale p" data-x="vale" data-loja="${l.id}" data-v="${v}">R$ ${v}</button>`).join('')}</div><br>${wa}`:
-  `<div class="box"><b>Quem somos nós?</b><p>${esc(l.quem_somos)||'<span class="mut">A loja ainda não preencheu esta seção.</span>'}</p>${f.min!=null?`<span class="tag">Produtos de ${brl(f.min)} a ${brl(f.max)}</span>`:''}</div>${ps.length?'<h3>Destaques</h3>'+grade(ps.slice(0,4)):''}${zap?`<br><a href="${zap}" target="_blank" rel="noopener"><button class="p" style="width:100%">Falar com a loja no WhatsApp</button></a>`:''}`;
- app.innerHTML=`<div class="ban" ${l.banner?`style="background-image:url('${l.banner}')"`:''}></div><div class="perfil">${l.avatar?`<img class="av" src="${l.avatar}" alt="">`:`<div class="av">${esc(l.nome.charAt(0).toUpperCase())}</div>`}<div><h2 style="margin:0">${esc(l.nome)}</h2><span class="mut">${ps.length} produtos</span></div></div><div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('ltab',n,`data-t="${k}"`,lt==k?'on':'')).join('')}</div>${body}`;
-}
-async function vMeus(){
- const o=await api('/api/meus-pedidos');
- app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${x.metodo}</span><br><span class="mut">${dt(x.criado)}</span></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
-}
-function pedido(it,m){
- cur={it,m};
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Finalizar pedido</h3><div class="mut">${esc(it.nome)} · ${brl(it.preco)} · ${m=='pix'?'Pix':'Cartão'}</div><br>${inp('f_n','Nome completo')}${inp('f_cep','CEP','','inputmode="numeric" maxlength="9"')}${inp('f_ci','Cidade')}${inp('f_ba','Bairro')}${inp('f_ru','Rua')}${inp('f_nu','Número da casa')}${inp('f_te','Telefone com DDD','','inputmode="tel"')}
- ${it.vale?'':inp('f_cu','Cupom de desconto (opcional)')+inp('f_va','Código do vale presente (opcional)')}
- <label>Foto do comprovante${m=='pix'?'':' (opcional)'}</label><input id="f_co" type="file" accept="image/*"><div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('enviar','Enviar pedido','','p')}</div></div></div>`;
+types.setTypeParser(20, Number);   // bigint  -> número (timestamps e COUNT)
+types.setTypeParser(1700, Number); // numeric -> número (SUM)
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 5 });
+
+// atalhos: troca ? por $1,$2... e devolve linhas
+const n$ = s => { let i = 0; return s.replace(/\?/g, () => '$' + (++i)); };
+const all = async (s, ...p) => (await pool.query(n$(s), p)).rows;
+const get = async (s, ...p) => (await all(s, ...p))[0];
+const run = async (s, ...p) => { await pool.query(n$(s), p); };
+
+async function criarTabelas() {
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS usuarios(id SERIAL PRIMARY KEY, email TEXT UNIQUE, senha_hash TEXT,
+    papel TEXT DEFAULT 'cliente', cpf TEXT, bloqueado INTEGER DEFAULT 0, criado BIGINT);
+  CREATE TABLE IF NOT EXISTS lojas(id SERIAL PRIMARY KEY, usuario_id INTEGER UNIQUE, slug TEXT UNIQUE,
+    nome TEXT, quem_somos TEXT DEFAULT '', whatsapp TEXT DEFAULT '', pix TEXT DEFAULT '');
+  CREATE TABLE IF NOT EXISTS produtos(id SERIAL PRIMARY KEY, loja_id INTEGER, classe TEXT, nome TEXT DEFAULT '',
+    tamanho TEXT DEFAULT '', descricao TEXT, preco DOUBLE PRECISION, estoque INTEGER DEFAULT 1, foto TEXT, criado BIGINT);
+  CREATE TABLE IF NOT EXISTS cupons(id SERIAL PRIMARY KEY, loja_id INTEGER, codigo TEXT, tipo TEXT, valor DOUBLE PRECISION, ativo INTEGER DEFAULT 1);
+  CREATE TABLE IF NOT EXISTS vales(id SERIAL PRIMARY KEY, loja_id INTEGER, codigo TEXT UNIQUE, valor DOUBLE PRECISION, usado INTEGER DEFAULT 0, criado BIGINT);
+  CREATE TABLE IF NOT EXISTS avisos(id SERIAL PRIMARY KEY, loja_id INTEGER, tipo TEXT, titulo TEXT, texto TEXT, criado BIGINT);
+  CREATE TABLE IF NOT EXISTS pedidos(id SERIAL PRIMARY KEY, loja_id INTEGER, usuario_id INTEGER, ip TEXT, produto_id INTEGER,
+    item TEXT, preco_original DOUBLE PRECISION, desconto DOUBLE PRECISION, preco DOUBLE PRECISION, cupom TEXT, metodo TEXT,
+    nome TEXT, cep TEXT, cidade TEXT, bairro TEXT, rua TEXT, numero TEXT, telefone TEXT, comprovante TEXT, criado BIGINT);
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS avatar TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS banner TEXT;`);
 }
 
-/* ---------- conta ---------- */
-function vConta(){
- const V=ar=='vendedor',login=modo=='entrar'||modo=='ventrar';
- const T=V?[['ventrar','Entrar na minha loja'],['vend','Criar minha loja']]:[['entrar','Entrar'],['criar','Criar conta']];
- app.innerHTML=`<div class="box" style="max-width:440px"><h3 style="margin-top:0">${V?'🏪 Área do vendedor':'Minha conta'}</h3><div class="row" style="margin-bottom:10px">${T.map(([k,n])=>bt('modo',n,`data-m="${k}"`,modo==k?'on':'')).join('')}</div>
- ${inp('e','E-mail','','type="email"')}${inp('s','Senha','','type="password"')}
- ${login?'':inp('s2','Confirmar senha','','type="password"')}
- ${modo=='vend'?inp('cpf','CPF','','inputmode="numeric"')+inp('nl','Nome da loja'):''}
- <div class="err" id="er"></div><button class="p" style="width:100%" data-x="conta">${login?'Entrar':modo=='vend'?'Criar minha loja':'Criar conta'}</button>
- <p class="mut" style="margin-bottom:0">${V?'É cliente? <a href="#" data-x="area" data-ar="cliente">Entrar como cliente</a>':'Tem uma loja? <a href="#" data-x="area" data-ar="vendedor">Área do vendedor</a>'}</p></div>`;
+// ---------- REGRAS ----------
+const CLASSES = { roupas: ['tamanho'], calcados: ['tamanho'], bolsas: [], perfumes: ['nome'], cosmeticos: ['nome'] };
+const VALES = [10, 30, 50, 70, 100, 200, 250, 300, 400, 500];
+const MAX_CUPOM = 50;
+const digits = s => String(s || '').replace(/\D/g, '');
+const txt = s => String(s ?? '').trim();
+const ehImagem = s => typeof s === 'string' && s.startsWith('data:image/');
+function cpfOk(c) {
+  c = digits(c); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false;
+  for (const k of [9, 10]) { let s = 0; for (let i = 0; i < k; i++) s += c[i] * (k + 1 - i); if (((s * 10) % 11) % 10 !== Number(c[k])) return false; }
+  return true;
 }
+const slugar = s => txt(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'loja';
 
-/* ---------- vendedor ---------- */
-async function vVend(){
- const T=[['loja','Loja'],['prod','Produtos'],['cup','Cupons'],['vale','Vales'],['avi','Avisos'],['ped','Pedidos'],['rel','Relatório']];
- app.innerHTML=`<div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('tab',n,`data-t="${k}"`,tab==k?'on':'')).join('')}</div><div id="tb"></div>`;
- await({loja:tLoja,prod:tProd,cup:tCup,vale:tVale,avi:tAvi,ped:tPed,rel:tRel})[tab]();
-}
-function tLoja(){
- const l=eu.loja,link=location.origin+'/?loja='+l.slug;
- $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Foto de perfil da loja (deixe vazio para manter a atual)</label><input id="av" type="file" accept="image/*"><label>Banner da loja (deixe vazio para manter o atual)</label><input id="bn" type="file" accept="image/*"><label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('wa','Seu WhatsApp (com DDD)',l.whatsapp,'inputmode="tel"')}${inp('px','Chave Pix',l.pix)}<div class="err" id="er"></div><div class="row">${bt('salvarloja','Salvar','','p')}${bt('go','Ver minha loja',`data-v="loja" data-a="${l.slug}"`)}</div></div>
- <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}<a href="https://wa.me/?text=${encodeURIComponent('Conheça a minha loja: '+link)}" target="_blank" rel="noopener"><button style="width:100%">Enviar no WhatsApp</button></a></div></div>`;
-}
-async function tProd(){
- const l=await api('/api/vendedor/produtos');
- $('#tb').innerHTML=`<div class="box"><h3 style="margin-top:0">Adicionar produto</h3><label>Classe</label><select id="cl">${Object.keys(NEED).map(k=>`<option value="${k}">${CL[k]}</option>`).join('')}</select><div id="ex"></div><label>Descrição</label><textarea id="d" rows="2"></textarea>${inp('pr','Preço (R$)','','inputmode="decimal"')}${inp('es','Quantidade em estoque','1','type="number" min="1"')}<label>Foto</label><input id="ft" type="file" accept="image/*"><div class="err" id="er"></div>${bt('addprod','Adicionar','','p')}</div><div class="grid">${l.map(p=>card(p,1)).join('')}</div>`;
- const ex=()=>{const n=NEED[$('#cl').value];$('#ex').innerHTML=(n.includes('nome')?inp('nm','Nome do produto'):'')+(n.includes('tam')?inp('tm','Tamanho'):'')};ex();$('#cl').onchange=ex;
-}
-async function tCup(){
- const l=await api('/api/vendedor/cupons');
- $('#tb').innerHTML=`<div class="box" style="max-width:420px"><h3 style="margin-top:0">Novo cupom</h3>${inp('cc','Código (ex: KIVRA10)')}<label>Tipo</label><select id="ct"><option value="percentual">Porcentagem (%) — máximo 50</option><option value="valor">Valor em R$ (limitado a 50% do preço)</option></select>${inp('cv','Valor','','inputmode="decimal"')}<div class="err" id="er"></div>${bt('addcup','Criar cupom','','p')}</div>`+
- l.map(c=>`<div class="box row" style="align-items:center"><div><b>${esc(c.codigo)}</b> · ${c.tipo=='percentual'?c.valor+'%':brl(c.valor)}</div>${bt('delcup','Excluir',`data-id="${c.id}"`)}</div>`).join('');
-}
-async function tVale(){
- const l=await api('/api/vendedor/vales');
- $('#tb').innerHTML=`<div class="box" style="max-width:420px"><h3 style="margin-top:0">Emitir vale presente</h3><select id="vv">${[10,30,50,70,100,200,250,300,400,500].map(v=>`<option value="${v}">R$ ${v}</option>`).join('')}</select><div class="err" id="er"></div>${bt('addvale','Emitir vale','','p')}</div>`+
- l.map(v=>`<div class="box"><b>${esc(v.codigo)}</b> · ${brl(v.valor)} <span class="tag">${v.usado?'usado':'disponível'}</span><br><span class="mut">${dt(v.criado)}</span></div>`).join('');
-}
-function tAvi(){
- $('#tb').innerHTML=`<div class="box" style="max-width:480px"><h3 style="margin-top:0">Aviso na página inicial</h3><label>Tipo</label><select id="at"><option value="promocao">Promoção</option><option value="estoque">Atualização de estoque</option></select>${inp('ati','Título')}<label>Texto</label><textarea id="atx" rows="3"></textarea><div class="err" id="er"></div>${bt('addavi','Publicar','','p')}</div>`;
-}
-async function tPed(){
- const o=await api('/api/vendedor/pedidos?ordem='+ord);
- $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 Venda: ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${x.metodo}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · <a href="https://wa.me/55${x.telefone.replace(/^55/,'')}" target="_blank" rel="noopener">${esc(x.telefone)}</a><br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)} · CEP ${esc(x.cep)}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:''}</div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
- $('#od').value=ord;
-}
-async function tRel(){$('#tb').innerHTML=relTab(await api('/api/vendedor/relatorio'))}
-const relTab=r=>`<div class="box sc"><table><tr><th>Período</th><th>Vendas</th><th>Total</th></tr>${[['mes','Mês'],['bimestre','Bimestre'],['trimestre','Trimestre'],['ano','Ano']].map(([k,n])=>`<tr><td>${n}</td><td>${r[k].vendas}</td><td>${brl(r[k].total)}</td></tr>`).join('')}</table></div>`;
-
-/* ---------- ADM ---------- */
-async function vAdm(){
- const [u,r]=await Promise.all([api('/api/admin/usuarios'),api('/api/admin/relatorio')]);
- app.innerHTML=`<h3>Relatório de vendas (todas as lojas)</h3>${relTab(r)}<h3>Usuários</h3><div class="sc box"><table><tr><th>E-mail</th><th>Tipo</th><th>Loja</th><th></th></tr>${u.map(x=>`<tr><td>${esc(x.email)}</td><td>${x.papel}${x.bloqueado?' 🚫':''}</td><td>${esc(x.loja||'')}</td><td>${x.papel=='admin'?'':bt('bloq',x.bloqueado?'Desbloquear':'Bloquear',`data-id="${x.id}" data-b="${x.bloqueado?0:1}"`)+' '+bt('deluser','Excluir',`data-id="${x.id}"`)}</td></tr>`).join('')}</table></div>`;
-}
-
-/* ---------- ações (um clique = uma função) ---------- */
-const A={
- go:d=>go(d.v,d.a),
- area:d=>{ar=d.ar;modo=ar=='vendedor'?'ventrar':'entrar';go('conta')},
- pass:d=>slide(sl+Number(d.n)),
- dot:d=>slide(Number(d.i)),
- pausa:(d,t)=>{pausa=!pausa;t.textContent=pausa?'▶':'⏸'},
- instalar:()=>{if(dp){dp.prompt();dp=null}else alert('Para instalar: no iPhone, toque em Compartilhar e depois em "Adicionar à Tela de Início". No Android ou no Windows, abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".')},
- buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};draw()},
- buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id},d.m)},
- vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)},'pix')},
- fechar:()=>$('#mod').innerHTML='',
- zoom:(d,t)=>{$('#mod').innerHTML=`<div class="modal"><div><img src="${t.src}" style="width:100%"><br><br><button data-x="fechar" style="width:100%">Fechar</button></div></div>`},
- enviar:async()=>{
-  const {it,m}=cur,f=$('#f_co').files[0];
-  const r=await api('/api/pedidos','POST',{produto_id:it.id,loja_id:it.loja_id,vale_valor:it.vale,metodo:m,nome:val('f_n'),cep:val('f_cep'),cidade:val('f_ci'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu'),telefone:val('f_te'),cupom:val('f_cu'),vale_codigo:val('f_va'),comprovante:f?await img(f,900):null});
-  const w=digits(r.whatsapp),msg=encodeURIComponent(`Olá! Fiz um pedido: ${it.nome} (${brl(r.total)}) via ${m}.`);
-  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido enviado ✅</h3><p>Total: <b>${brl(r.total)}</b>. Combine a entrega ou retirada pelo WhatsApp.</p>${m=='pix'&&r.pix?`<p>Chave Pix: <b>${esc(r.pix)}</b></p>`:''}${w?`<a href="https://wa.me/55${w.replace(/^55/,'')}?text=${msg}" target="_blank" rel="noopener"><button class="p" style="width:100%">Falar com o vendedor</button></a><br><br>`:''}<button data-x="fechar" style="width:100%">Fechar</button></div></div>`;
- },
- modo:d=>{modo=d.m;vConta()},
- conta:async()=>{
-  if(modo=='entrar'||modo=='ventrar')await api('/api/login','POST',{email:val('e'),senha:$('#s').value});
-  else await api('/api/cadastro','POST',{email:val('e'),senha:$('#s').value,confirmar:$('#s2').value,tipo:modo=='vend'?'vendedor':'cliente',cpf:val('cpf'),nomeLoja:val('nl')});
-  eu=await api('/api/eu');if(ar=='vendedor'&&eu.papel=='cliente')alert('Esta conta é de cliente. Para vender, crie uma conta em "Criar minha loja".');go(eu.papel=='vendedor'?'vend':eu.papel=='admin'?'adm':'inicio');
- },
- sair:async()=>{await api('/api/logout','POST');eu={logado:false};go('inicio')},
- tab:d=>{tab=d.t;vVend()},
- ltab:d=>{lt=d.t;vLoja()},
- salvarloja:async()=>{const a=$('#av').files[0],b=$('#bn').files[0];await api('/api/vendedor/loja','PUT',{nome:val('ln'),quem_somos:$('#qs').value,whatsapp:val('wa'),pix:val('px'),avatar:a?await img(a,400):undefined,banner:b?await img(b,1200):undefined});eu=await api('/api/eu');$('#er').textContent='Salvo ✔'},
- copiar:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Link copiado!')}catch(e){prompt('Copie o link:',d.l)}},
- addprod:async()=>{const f=$('#ft').files[0];if(!f)throw new Error('Adicione a foto.');await api('/api/vendedor/produtos','POST',{classe:val('cl'),nome:val('nm'),tamanho:val('tm'),descricao:val('d'),preco:parseFloat(val('pr').replace(',','.')),estoque:val('es'),foto:await img(f)});tProd()},
- estoque:async d=>{await api(`/api/vendedor/produtos/${d.id}/estoque`,'PUT',{estoque:$('#e'+d.id).value});tProd()},
- delprod:async d=>{if(confirm('Excluir produto?')){await api('/api/vendedor/produtos/'+d.id,'DELETE');tProd()}},
- addcup:async()=>{await api('/api/vendedor/cupons','POST',{codigo:val('cc'),tipo:val('ct'),valor:val('cv').replace(',','.')});tCup()},
- delcup:async d=>{await api('/api/vendedor/cupons/'+d.id,'DELETE');tCup()},
- addvale:async()=>{const r=await api('/api/vendedor/vales','POST',{valor:val('vv')});alert('Vale emitido! Código: '+r.codigo);tVale()},
- addavi:async()=>{await api('/api/vendedor/avisos','POST',{tipo:val('at'),titulo:val('ati'),texto:$('#atx').value});$('#er').textContent='Publicado ✔'},
- bloq:async d=>{await api(`/api/admin/usuarios/${d.id}/bloqueio`,'POST',{bloqueado:d.b=='1'});vAdm()},
- deluser:async d=>{if(confirm('Excluir este usuário e os dados dele?')){await api('/api/admin/usuarios/'+d.id,'DELETE');vAdm()}},
+const app = express();
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '6mb' }));
+app.use(session({
+  store: new PgSession({ pool, createTableIfMissing: true }), // login guardado no Supabase
+  secret: process.env.SEGREDO || 'troque-este-segredo', resave: false, saveUninitialized: false,
+  cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 30 * 24 * 3600 * 1000 },
+}));
+app.use(async (req, res, next) => {
+  req.u = req.session.uid ? await get('SELECT * FROM usuarios WHERE id=?', req.session.uid) : null;
+  if (req.u && req.u.bloqueado) { req.u = null; req.session.uid = null; }
+  next();
+});
+const logado = (req, res, next) => req.u ? next() : res.status(401).json({ erro: 'Entre na sua conta.' });
+const vendedor = async (req, res, next) => {
+  if (!req.u || req.u.papel !== 'vendedor') return res.status(403).json({ erro: 'Apenas vendedores.' });
+  req.loja = await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix FROM lojas WHERE usuario_id=?', req.u.id); next();
 };
-document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
- try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
-document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
-init();
-</script></body></html>
+const admin = (req, res, next) =>
+  req.u && req.u.papel === 'admin' && req.u.email === ADMIN_EMAIL ? next() : res.status(403).json({ erro: 'Acesso negado.' });
+
+// ---------- CONTA ----------
+app.post('/api/cadastro', async (req, res) => {
+  const { senha, confirmar, cpf, nomeLoja } = req.body;
+  const email = txt(req.body.email).toLowerCase();
+  const tipo = req.body.tipo === 'vendedor' ? 'vendedor' : 'cliente';
+  if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ erro: 'E-mail inválido.' });
+  if (!senha || senha.length < 6) return res.status(400).json({ erro: 'Senha com no mínimo 6 caracteres.' });
+  if (senha !== confirmar) return res.status(400).json({ erro: 'As senhas não são iguais.' });
+  if (await get('SELECT 1 AS x FROM usuarios WHERE email=?', email)) return res.status(400).json({ erro: 'E-mail já cadastrado.' });
+  if (tipo === 'vendedor' && (!cpfOk(cpf) || !txt(nomeLoja))) return res.status(400).json({ erro: 'Vendedor precisa de CPF válido e nome da loja.' });
+  const papel = email === ADMIN_EMAIL ? 'admin' : tipo;
+  const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado) VALUES(?,?,?,?,?) RETURNING id',
+    email, bcrypt.hashSync(senha, 10), papel, tipo === 'vendedor' ? digits(cpf) : null, Date.now());
+  if (tipo === 'vendedor') {
+    let slug = slugar(nomeLoja); if (await get('SELECT 1 AS x FROM lojas WHERE slug=?', slug)) slug += '-' + crypto.randomBytes(2).toString('hex');
+    await run('INSERT INTO lojas(usuario_id,slug,nome) VALUES(?,?,?)', u.id, slug, txt(nomeLoja));
+  }
+  req.session.uid = u.id; res.json({ ok: true });
+});
+app.post('/api/login', async (req, res) => {
+  const u = await get('SELECT * FROM usuarios WHERE email=?', txt(req.body.email).toLowerCase());
+  if (!u || !bcrypt.compareSync(req.body.senha || '', u.senha_hash)) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+  if (u.bloqueado) return res.status(403).json({ erro: 'Conta bloqueada. Fale com o administrador.' });
+  req.session.uid = u.id; res.json({ ok: true });
+});
+app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
+app.get('/api/eu', async (req, res) => {
+  if (!req.u) return res.json({ logado: false });
+  const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix FROM lojas WHERE usuario_id=?', req.u.id) : null;
+  res.json({ logado: true, email: req.u.email, papel: req.u.papel, loja });
+});
+
+// ---------- VITRINE PÚBLICA ----------
+app.get('/api/produtos', async (req, res) => {
+  const { q, classe, min, max, loja } = req.query;
+  let sql = `SELECT p.*, l.nome AS loja_nome, l.slug FROM produtos p JOIN lojas l ON l.id=p.loja_id
+             JOIN usuarios u ON u.id=l.usuario_id WHERE u.bloqueado=0 AND p.estoque>0`; const a = [];
+  if (txt(q)) { sql += ' AND (p.nome ILIKE ? OR p.descricao ILIKE ?)'; a.push(`%${txt(q)}%`, `%${txt(q)}%`); }
+  if (classe) { sql += ' AND p.classe=?'; a.push(classe); }
+  if (min !== undefined && min !== '') { sql += ' AND p.preco>=?'; a.push(Number(min)); }
+  if (max !== undefined && max !== '') { sql += ' AND p.preco<=?'; a.push(Number(max)); }
+  if (loja) { sql += ' AND l.slug=?'; a.push(loja); }
+  res.json(await all(sql + ' ORDER BY p.criado DESC', ...a));
+});
+app.get('/api/lojas/:slug', async (req, res) => {
+  const l = await get(`SELECT l.id,l.nome,l.slug,l.quem_somos,l.whatsapp,l.avatar,l.banner FROM lojas l JOIN usuarios u ON u.id=l.usuario_id
+                       WHERE l.slug=? AND u.bloqueado=0`, req.params.slug);
+  if (!l) return res.status(404).json({ erro: 'Loja não encontrada.' });
+  const faixa = await get('SELECT MIN(preco) AS min, MAX(preco) AS max FROM produtos WHERE loja_id=? AND estoque>0', l.id);
+  res.json({ ...l, faixa_preco: faixa, vales: VALES });
+});
+app.get('/api/lojas', async (req, res) => res.json(await all(
+  `SELECT l.nome,l.slug FROM lojas l JOIN usuarios u ON u.id=l.usuario_id WHERE u.bloqueado=0 ORDER BY l.nome`)));
+app.get('/api/inicio', async (req, res) => res.json(await all(
+  `SELECT a.tipo,a.titulo,a.texto,a.criado,l.nome AS loja_nome,l.slug FROM avisos a JOIN lojas l ON l.id=a.loja_id
+   JOIN usuarios u ON u.id=l.usuario_id WHERE u.bloqueado=0 ORDER BY a.criado DESC LIMIT 30`)));
+
+// ---------- VENDEDOR ----------
+app.put('/api/vendedor/loja', vendedor, async (req, res) => {
+  const w = digits(req.body.whatsapp);
+  if (!txt(req.body.nome)) return res.status(400).json({ erro: 'Informe o nome da loja.' });
+  if (w && w.length < 10) return res.status(400).json({ erro: 'WhatsApp inválido.' });
+  await run('UPDATE lojas SET nome=?, quem_somos=?, whatsapp=?, pix=? WHERE id=?', txt(req.body.nome), txt(req.body.quem_somos), w, txt(req.body.pix), req.loja.id);
+  if (ehImagem(req.body.avatar)) await run('UPDATE lojas SET avatar=? WHERE id=?', req.body.avatar, req.loja.id);
+  if (ehImagem(req.body.banner)) await run('UPDATE lojas SET banner=? WHERE id=?', req.body.banner, req.loja.id);
+  res.json({ ok: true });
+});
+app.get('/api/vendedor/produtos', vendedor, async (req, res) => res.json(await all('SELECT * FROM produtos WHERE loja_id=? ORDER BY criado DESC', req.loja.id)));
+app.post('/api/vendedor/produtos', vendedor, async (req, res) => {
+  const { classe, nome, tamanho, descricao, preco, foto, estoque } = req.body;
+  if (!CLASSES[classe]) return res.status(400).json({ erro: 'Classe inválida.' });
+  const d = { nome: txt(nome), tamanho: txt(tamanho) };
+  for (const c of CLASSES[classe]) if (!d[c]) return res.status(400).json({ erro: `Informe o campo: ${c}.` });
+  if (!txt(descricao)) return res.status(400).json({ erro: 'Informe a descrição.' });
+  if (!(Number(preco) > 0)) return res.status(400).json({ erro: 'Preço inválido.' });
+  if (!ehImagem(foto)) return res.status(400).json({ erro: 'Adicione a foto.' });
+  await run('INSERT INTO produtos(loja_id,classe,nome,tamanho,descricao,preco,estoque,foto,criado) VALUES(?,?,?,?,?,?,?,?,?)',
+    req.loja.id, classe, d.nome, d.tamanho, txt(descricao), Number(preco), Math.max(1, parseInt(estoque) || 1), foto, Date.now());
+  res.json({ ok: true });
+});
+app.put('/api/vendedor/produtos/:id/estoque', vendedor, async (req, res) => {
+  const est = parseInt(req.body.estoque); if (!(est >= 0)) return res.status(400).json({ erro: 'Estoque inválido.' });
+  await run('UPDATE produtos SET estoque=? WHERE id=? AND loja_id=?', est, req.params.id, req.loja.id); res.json({ ok: true });
+});
+app.delete('/api/vendedor/produtos/:id', vendedor, async (req, res) => { await run('DELETE FROM produtos WHERE id=? AND loja_id=?', req.params.id, req.loja.id); res.json({ ok: true }); });
+
+app.get('/api/vendedor/cupons', vendedor, async (req, res) => res.json(await all('SELECT * FROM cupons WHERE loja_id=?', req.loja.id)));
+app.post('/api/vendedor/cupons', vendedor, async (req, res) => {
+  const codigo = txt(req.body.codigo).toUpperCase(), tipo = req.body.tipo, valor = Number(req.body.valor);
+  if (!/^[A-Z0-9]{3,20}$/.test(codigo)) return res.status(400).json({ erro: 'Código: 3 a 20 letras ou números.' });
+  if (!['percentual', 'valor'].includes(tipo) || !(valor > 0)) return res.status(400).json({ erro: 'Valor do cupom inválido.' });
+  if (tipo === 'percentual' && valor > MAX_CUPOM) return res.status(400).json({ erro: `Cupons acima de ${MAX_CUPOM}% não podem ser emitidos.` });
+  if (await get('SELECT 1 AS x FROM cupons WHERE loja_id=? AND codigo=?', req.loja.id, codigo)) return res.status(400).json({ erro: 'Esse código já existe.' });
+  await run('INSERT INTO cupons(loja_id,codigo,tipo,valor) VALUES(?,?,?,?)', req.loja.id, codigo, tipo, valor); res.json({ ok: true });
+});
+app.delete('/api/vendedor/cupons/:id', vendedor, async (req, res) => { await run('DELETE FROM cupons WHERE id=? AND loja_id=?', req.params.id, req.loja.id); res.json({ ok: true }); });
+
+app.get('/api/vendedor/vales', vendedor, async (req, res) => res.json(await all('SELECT * FROM vales WHERE loja_id=? ORDER BY criado DESC', req.loja.id)));
+app.post('/api/vendedor/vales', vendedor, async (req, res) => {
+  const valor = Number(req.body.valor);
+  if (!VALES.includes(valor)) return res.status(400).json({ erro: 'Valor não disponível para vale presente.' });
+  const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  await run('INSERT INTO vales(loja_id,codigo,valor,criado) VALUES(?,?,?,?)', req.loja.id, codigo, valor, Date.now());
+  res.json({ ok: true, codigo, valor });
+});
+app.post('/api/vendedor/avisos', vendedor, async (req, res) => {
+  const tipo = req.body.tipo === 'estoque' ? 'estoque' : 'promocao';
+  if (!txt(req.body.titulo)) return res.status(400).json({ erro: 'Informe o título.' });
+  await run('INSERT INTO avisos(loja_id,tipo,titulo,texto,criado) VALUES(?,?,?,?,?)', req.loja.id, tipo, txt(req.body.titulo), txt(req.body.texto), Date.now());
+  res.json({ ok: true });
+});
+app.get('/api/vendedor/pedidos', vendedor, async (req, res) =>
+  res.json(await all(`SELECT * FROM pedidos WHERE loja_id=? ORDER BY criado ${req.query.ordem === 'antigos' ? 'ASC' : 'DESC'}`, req.loja.id)));
+
+async function relatorio(lojaId) {
+  const d = new Date(), y = d.getFullYear(), m = d.getMonth();
+  const ini = { mes: new Date(y, m, 1), bimestre: new Date(y, Math.floor(m / 2) * 2, 1),
+                trimestre: new Date(y, Math.floor(m / 3) * 3, 1), ano: new Date(y, 0, 1) };
+  const out = {};
+  for (const [k, t] of Object.entries(ini)) {
+    const r = lojaId
+      ? await get('SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS total FROM pedidos WHERE loja_id=? AND criado>=?', lojaId, +t)
+      : await get('SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS total FROM pedidos WHERE criado>=?', +t);
+    out[k] = { vendas: r.n, total: r.total };
+  }
+  return out;
+}
+app.get('/api/vendedor/relatorio', vendedor, async (req, res) => res.json(await relatorio(req.loja.id)));
+
+// ---------- PEDIDOS ----------
+app.post('/api/pedidos', logado, async (req, res) => {
+  const b = req.body; let loja_id, item, preco, produto_id = null;
+  if (b.vale_valor) {
+    const l = await get('SELECT id FROM lojas WHERE id=?', b.loja_id);
+    if (!l || !VALES.includes(Number(b.vale_valor))) return res.status(400).json({ erro: 'Vale inválido.' });
+    loja_id = l.id; item = `Vale presente R$ ${Number(b.vale_valor)}`; preco = Number(b.vale_valor);
+  } else {
+    const p = await get('SELECT p.*, u.bloqueado FROM produtos p JOIN lojas l ON l.id=p.loja_id JOIN usuarios u ON u.id=l.usuario_id WHERE p.id=?', b.produto_id ?? null);
+    if (!p || p.bloqueado) return res.status(404).json({ erro: 'Produto não encontrado.' });
+    if (p.estoque < 1) return res.status(400).json({ erro: 'Produto sem estoque.' });
+    loja_id = p.loja_id; produto_id = p.id; item = p.nome || p.classe; preco = p.preco;
+  }
+  if (!txt(b.nome) || !txt(b.cidade) || !txt(b.bairro) || !txt(b.rua) || !txt(b.numero)) return res.status(400).json({ erro: 'Preencha todos os campos.' });
+  if (digits(b.cep).length !== 8) return res.status(400).json({ erro: 'CEP inválido.' });
+  if (digits(b.telefone).length < 10) return res.status(400).json({ erro: 'Telefone inválido (DDD + número).' });
+  if (!['pix', 'cartao'].includes(b.metodo)) return res.status(400).json({ erro: 'Forma de pagamento inválida.' });
+  if (b.metodo === 'pix' && !ehImagem(b.comprovante)) return res.status(400).json({ erro: 'Anexe o comprovante do Pix.' });
+
+  let desconto = 0, cupom = null;
+  if (txt(b.cupom) && produto_id) {
+    const c = await get('SELECT * FROM cupons WHERE loja_id=? AND codigo=? AND ativo=1', loja_id, txt(b.cupom).toUpperCase());
+    if (!c) return res.status(400).json({ erro: 'Cupom inválido.' });
+    desconto = Math.min(c.tipo === 'percentual' ? preco * c.valor / 100 : c.valor, preco * MAX_CUPOM / 100); cupom = c.codigo;
+  }
+  let vale = null;
+  if (txt(b.vale_codigo) && produto_id) {
+    vale = await get('SELECT * FROM vales WHERE loja_id=? AND codigo=? AND usado=0', loja_id, txt(b.vale_codigo).toUpperCase());
+    if (!vale) return res.status(400).json({ erro: 'Vale presente inválido ou já usado.' });
+    desconto += Math.min(vale.valor, preco - desconto);
+  }
+  const final = Math.max(preco - desconto, 0);
+  await run(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,telefone,comprovante,criado)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    loja_id, req.u.id, req.ip, produto_id, item, preco, desconto, final, cupom, b.metodo, txt(b.nome), digits(b.cep),
+    txt(b.cidade), txt(b.bairro), txt(b.rua), txt(b.numero), digits(b.telefone), ehImagem(b.comprovante) ? b.comprovante : null, Date.now());
+  if (produto_id) await run('UPDATE produtos SET estoque=estoque-1 WHERE id=?', produto_id);
+  if (vale) await run('UPDATE vales SET usado=1 WHERE id=?', vale.id);
+  const l = await get('SELECT whatsapp,pix FROM lojas WHERE id=?', loja_id);
+  res.json({ ok: true, total: final, whatsapp: l.whatsapp, pix: l.pix });
+});
+app.get('/api/meus-pedidos', logado, async (req, res) =>
+  res.json(await all('SELECT id,item,preco,metodo,criado FROM pedidos WHERE usuario_id=? ORDER BY criado DESC', req.u.id)));
+
+// ---------- PAINEL ADM ----------
+app.get('/api/admin/usuarios', admin, async (req, res) =>
+  res.json(await all('SELECT u.id,u.email,u.papel,u.bloqueado,u.criado,l.nome AS loja FROM usuarios u LEFT JOIN lojas l ON l.usuario_id=u.id ORDER BY u.criado DESC')));
+app.post('/api/admin/usuarios/:id/bloqueio', admin, async (req, res) => {
+  const u = await get('SELECT * FROM usuarios WHERE id=?', req.params.id);
+  if (!u || u.papel === 'admin') return res.status(400).json({ erro: 'Não é possível alterar este usuário.' });
+  await run('UPDATE usuarios SET bloqueado=? WHERE id=?', req.body.bloqueado ? 1 : 0, u.id); res.json({ ok: true });
+});
+app.delete('/api/admin/usuarios/:id', admin, async (req, res) => {
+  const u = await get('SELECT * FROM usuarios WHERE id=?', req.params.id);
+  if (!u || u.papel === 'admin') return res.status(400).json({ erro: 'Não é possível excluir este usuário.' });
+  const l = await get('SELECT id FROM lojas WHERE usuario_id=?', u.id);
+  if (l) for (const t of ['produtos', 'cupons', 'vales', 'avisos', 'pedidos']) await run(`DELETE FROM ${t} WHERE loja_id=?`, l.id);
+  await run('DELETE FROM lojas WHERE usuario_id=?', u.id);
+  await run('UPDATE pedidos SET usuario_id=NULL WHERE usuario_id=?', u.id);
+  await run('DELETE FROM usuarios WHERE id=?', u.id); res.json({ ok: true });
+});
+app.get('/api/admin/relatorio', admin, async (req, res) => res.json(await relatorio(null)));
+
+// ---------- SITE ----------
+const PUBLIC = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC));
+app.get('/', (req, res) => {
+  const f = path.join(PUBLIC, 'index.html');
+  fs.existsSync(f) ? res.sendFile(f) : res.status(404).send('<h3>index.html não encontrado na pasta public</h3>');
+});
+app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: 'Erro interno do servidor.' }); });
+
+criarTabelas().then(() => app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000))))
+  .catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
