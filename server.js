@@ -65,13 +65,13 @@ function img(file,max=700){return new Promise((ok,no)=>{const r=new FileReader()
 const inp=(id,l,v='',a='')=>`<label>${l}</label><input id="${id}" value="${esc(v)}" ${a}>`;
 const bt=(x,t,d='',c='')=>`<button class="${c}" data-x="${x}" ${d}>${t}</button>`;
 
-let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null;
+let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null,ar='cliente';
 function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
 function nav(){
  const b=(v,t)=>`<button data-x="go" data-v="${v}" class="${view==v?'on':''}">${t}</button>`;
  $('#nav').innerHTML=b('inicio','🏠 Início')+b('prod','🔎 Produtos')+(eu.logado?b('meus','Meus pedidos'):'')+
   (eu.papel=='vendedor'?b('vend','🏪 Minha loja'):'')+(eu.papel=='admin'?b('adm','🛡️ ADM'):'')+
-  (eu.logado?bt('sair','Sair'):b('conta','Entrar / Criar conta'));
+  (eu.logado?bt('sair','Sair'):bt('area','Entrar / Criar conta','data-ar="cliente"')+bt('area','🏪 Área do vendedor','data-ar="vendedor"','p'));
 }
 async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
 async function init(){try{eu=await api('/api/eu')}catch(e){}const l=new URLSearchParams(location.search).get('loja');l?go('loja',l):go('inicio')}
@@ -131,11 +131,14 @@ function pedido(it,m){
 
 /* ---------- conta ---------- */
 function vConta(){
- app.innerHTML=`<div class="box" style="max-width:440px"><div class="row" style="margin-bottom:10px">${bt('modo','Entrar','data-m="entrar"',modo=='entrar'?'on':'')}${bt('modo','Criar conta','data-m="criar"',modo=='criar'?'on':'')}${bt('modo','Conta de vendedor','data-m="vend"',modo=='vend'?'on':'')}</div>
+ const V=ar=='vendedor',login=modo=='entrar'||modo=='ventrar';
+ const T=V?[['ventrar','Entrar na minha loja'],['vend','Criar minha loja']]:[['entrar','Entrar'],['criar','Criar conta']];
+ app.innerHTML=`<div class="box" style="max-width:440px"><h3 style="margin-top:0">${V?'🏪 Área do vendedor':'Minha conta'}</h3><div class="row" style="margin-bottom:10px">${T.map(([k,n])=>bt('modo',n,`data-m="${k}"`,modo==k?'on':'')).join('')}</div>
  ${inp('e','E-mail','','type="email"')}${inp('s','Senha','','type="password"')}
- ${modo!='entrar'?inp('s2','Confirmar senha','','type="password"'):''}
+ ${login?'':inp('s2','Confirmar senha','','type="password"')}
  ${modo=='vend'?inp('cpf','CPF','','inputmode="numeric"')+inp('nl','Nome da loja'):''}
- <div class="err" id="er"></div><button class="p" style="width:100%" data-x="conta">${modo=='entrar'?'Entrar':'Criar conta'}</button></div>`;
+ <div class="err" id="er"></div><button class="p" style="width:100%" data-x="conta">${login?'Entrar':modo=='vend'?'Criar minha loja':'Criar conta'}</button>
+ <p class="mut" style="margin-bottom:0">${V?'É cliente? <a href="#" data-x="area" data-ar="cliente">Entrar como cliente</a>':'Tem uma loja? <a href="#" data-x="area" data-ar="vendedor">Área do vendedor</a>'}</p></div>`;
 }
 
 /* ---------- vendedor ---------- */
@@ -184,13 +187,14 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ area:d=>{ar=d.ar;modo=ar=='vendedor'?'ventrar':'entrar';go('conta')},
  pass:d=>slide(sl+Number(d.n)),
  dot:d=>slide(Number(d.i)),
  pausa:(d,t)=>{pausa=!pausa;t.textContent=pausa?'▶':'⏸'},
  instalar:()=>{if(dp){dp.prompt();dp=null}else alert('Para instalar: no iPhone, toque em Compartilhar e depois em "Adicionar à Tela de Início". No Android ou no Windows, abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".')},
  buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};draw()},
- buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return go('conta')}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id},d.m)},
- vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return go('conta')}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)},'pix')},
+ buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id},d.m)},
+ vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)},'pix')},
  fechar:()=>$('#mod').innerHTML='',
  zoom:(d,t)=>{$('#mod').innerHTML=`<div class="modal"><div><img src="${t.src}" style="width:100%"><br><br><button data-x="fechar" style="width:100%">Fechar</button></div></div>`},
  enviar:async()=>{
@@ -201,9 +205,9 @@ const A={
  },
  modo:d=>{modo=d.m;vConta()},
  conta:async()=>{
-  if(modo=='entrar')await api('/api/login','POST',{email:val('e'),senha:$('#s').value});
+  if(modo=='entrar'||modo=='ventrar')await api('/api/login','POST',{email:val('e'),senha:$('#s').value});
   else await api('/api/cadastro','POST',{email:val('e'),senha:$('#s').value,confirmar:$('#s2').value,tipo:modo=='vend'?'vendedor':'cliente',cpf:val('cpf'),nomeLoja:val('nl')});
-  eu=await api('/api/eu');go(eu.papel=='vendedor'?'vend':eu.papel=='admin'?'adm':'inicio');
+  eu=await api('/api/eu');if(ar=='vendedor'&&eu.papel=='cliente')alert('Esta conta é de cliente. Para vender, crie uma conta em "Criar minha loja".');go(eu.papel=='vendedor'?'vend':eu.papel=='admin'?'adm':'inicio');
  },
  sair:async()=>{await api('/api/logout','POST');eu={logado:false};go('inicio')},
  tab:d=>{tab=d.t;vVend()},
