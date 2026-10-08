@@ -41,13 +41,18 @@ async function criarTabelas() {
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS banner TEXT;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendente';
   CREATE TABLE IF NOT EXISTS mensagens(id SERIAL PRIMARY KEY, pedido_id INTEGER, autor_id INTEGER, texto TEXT, criado BIGINT);
-  CREATE INDEX IF NOT EXISTS idx_msg_pedido ON mensagens(pedido_id);`);
+  CREATE INDEX IF NOT EXISTS idx_msg_pedido ON mensagens(pedido_id);
+  ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aceite_politica BIGINT;
+  ALTER TABLE vales ADD COLUMN IF NOT EXISTS saldo DOUBLE PRECISION;
+  UPDATE vales SET saldo = CASE WHEN usado=1 THEN 0 ELSE valor END WHERE saldo IS NULL;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS estado TEXT;`);
 }
 
 // ---------- REGRAS ----------
 const CLASSES = { roupas: ['tamanho'], calcados: ['tamanho'], bolsas: [], perfumes: ['nome'], cosmeticos: ['nome'] };
 const VALES = [10, 30, 50, 70, 100, 200, 250, 300, 400, 500];
 const MAX_CUPOM = 50;
+const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 const digits = s => String(s || '').replace(/\D/g, '');
 const txt = s => String(s ?? '').trim();
 const ehImagem = s => typeof s === 'string' && s.startsWith('data:image/');
@@ -87,11 +92,12 @@ app.post('/api/cadastro', async (req, res) => {
   if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ erro: 'E-mail inválido.' });
   if (!senha || senha.length < 6) return res.status(400).json({ erro: 'Senha com no mínimo 6 caracteres.' });
   if (senha !== confirmar) return res.status(400).json({ erro: 'As senhas não são iguais.' });
+  if (!req.body.aceite) return res.status(400).json({ erro: 'Aceite a Política de Privacidade para criar a conta.' });
   if (await get('SELECT 1 AS x FROM usuarios WHERE email=?', email)) return res.status(400).json({ erro: 'E-mail já cadastrado.' });
   if (tipo === 'vendedor' && (!cpfOk(cpf) || !txt(nomeLoja))) return res.status(400).json({ erro: 'Vendedor precisa de CPF válido e nome da loja.' });
   const papel = email === ADMIN_EMAIL ? 'admin' : tipo;
-  const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado) VALUES(?,?,?,?,?) RETURNING id',
-    email, bcrypt.hashSync(senha, 10), papel, tipo === 'vendedor' ? digits(cpf) : null, Date.now());
+  const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado,aceite_politica) VALUES(?,?,?,?,?,?) RETURNING id',
+    email, bcrypt.hashSync(senha, 10), papel, tipo === 'vendedor' ? digits(cpf) : null, Date.now(), Date.now());
   if (tipo === 'vendedor') {
     let slug = slugar(nomeLoja); if (await get('SELECT 1 AS x FROM lojas WHERE slug=?', slug)) slug += '-' + crypto.randomBytes(2).toString('hex');
     await run('INSERT INTO lojas(usuario_id,slug,nome) VALUES(?,?,?)', u.id, slug, txt(nomeLoja));
@@ -181,7 +187,7 @@ app.post('/api/vendedor/vales', vendedor, async (req, res) => {
   const valor = Number(req.body.valor);
   if (!VALES.includes(valor)) return res.status(400).json({ erro: 'Valor não disponível para vale presente.' });
   const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-  await run('INSERT INTO vales(loja_id,codigo,valor,criado) VALUES(?,?,?,?)', req.loja.id, codigo, valor, Date.now());
+  await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', req.loja.id, codigo, valor, valor, Date.now());
   res.json({ ok: true, codigo, valor });
 });
 app.post('/api/vendedor/avisos', vendedor, async (req, res) => {
@@ -221,8 +227,13 @@ app.post('/api/pedidos', logado, async (req, res) => {
     if (p.estoque < 1) return res.status(400).json({ erro: 'Produto sem estoque.' });
     loja_id = p.loja_id; produto_id = p.id; item = p.nome || p.classe; preco = p.preco;
   }
-  if (!txt(b.nome) || !txt(b.cidade) || !txt(b.bairro) || !txt(b.rua) || !txt(b.numero)) return res.status(400).json({ erro: 'Preencha todos os campos.' });
-  if (digits(b.cep).length !== 8) return res.status(400).json({ erro: 'CEP inválido.' });
+  const ehVale = !produto_id;   // vale presente não tem entrega, então não pede endereço
+  if (!txt(b.nome)) return res.status(400).json({ erro: 'Informe o seu nome.' });
+  if (!ehVale) {
+    if (!UFS.includes(b.estado)) return res.status(400).json({ erro: 'Escolha o estado.' });
+    if (!txt(b.cidade) || !txt(b.bairro) || !txt(b.rua) || !txt(b.numero)) return res.status(400).json({ erro: 'Preencha todos os campos do endereço.' });
+    if (digits(b.cep).length !== 8) return res.status(400).json({ erro: 'CEP inválido.' });
+  }
   if (digits(b.telefone).length < 10) return res.status(400).json({ erro: 'Telefone inválido (DDD + número).' });
   if (!['pix', 'credito', 'debito'].includes(b.metodo)) return res.status(400).json({ erro: 'Forma de pagamento inválida.' });
 
@@ -232,19 +243,21 @@ app.post('/api/pedidos', logado, async (req, res) => {
     if (!c) return res.status(400).json({ erro: 'Cupom inválido.' });
     desconto = Math.min(c.tipo === 'percentual' ? preco * c.valor / 100 : c.valor, preco * MAX_CUPOM / 100); cupom = c.codigo;
   }
-  let vale = null;
+  let vale = null, valeUsado = 0;
   if (txt(b.vale_codigo) && produto_id) {
     vale = await get('SELECT * FROM vales WHERE loja_id=? AND codigo=? AND usado=0', loja_id, txt(b.vale_codigo).toUpperCase());
     if (!vale) return res.status(400).json({ erro: 'Vale presente inválido ou já usado.' });
-    desconto += Math.min(vale.valor, preco - desconto);
+    valeUsado = Math.min(vale.saldo ?? vale.valor, preco - desconto);
+    desconto += valeUsado;
   }
   const final = Math.max(preco - desconto, 0);
-  const ped = await get(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,telefone,comprovante,criado)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
-    loja_id, req.u.id, req.ip, produto_id, item, preco, desconto, final, cupom, b.metodo, txt(b.nome), digits(b.cep),
-    txt(b.cidade), txt(b.bairro), txt(b.rua), txt(b.numero), digits(b.telefone), ehImagem(b.comprovante) ? b.comprovante : null, Date.now());
+  const ped = await get(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,estado,telefone,comprovante,criado)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
+    loja_id, req.u.id, req.ip, produto_id, item, preco, desconto, final, cupom, b.metodo, txt(b.nome),
+    ehVale ? null : digits(b.cep), ehVale ? null : txt(b.cidade), ehVale ? null : txt(b.bairro), ehVale ? null : txt(b.rua),
+    ehVale ? null : txt(b.numero), ehVale ? null : b.estado, digits(b.telefone), null, Date.now());
   if (produto_id) await run('UPDATE produtos SET estoque=estoque-1 WHERE id=?', produto_id);
-  if (vale) await run('UPDATE vales SET usado=1 WHERE id=?', vale.id);
+  if (vale) await run('UPDATE vales SET saldo=saldo-?, usado=CASE WHEN saldo-?<=0.001 THEN 1 ELSE 0 END WHERE id=?', valeUsado, valeUsado, vale.id);
   const l = await get('SELECT whatsapp,pix FROM lojas WHERE id=?', loja_id);
   res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix });
 });
@@ -265,71 +278,4 @@ async function acessoPedido(req, res) {   // só o comprador e o vendedor da loj
   res.status(404).json({ erro: 'Pedido não encontrado.' }); return null;
 }
 app.put('/api/pedidos/:id/comprovante', logado, async (req, res) => {
-  const p = await get('SELECT * FROM pedidos WHERE id=? AND usuario_id=?', req.params.id, req.u.id);
-  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
-  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido pelo vendedor.' });
-  if (!ehImagem(req.body.comprovante)) return res.status(400).json({ erro: 'Anexe a foto do comprovante.' });
-  await run('UPDATE pedidos SET comprovante=? WHERE id=?', req.body.comprovante, p.id);
-  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, '📎 Enviei o comprovante do Pix.', Date.now());
-  res.json({ ok: true });
-});
-app.get('/api/pedidos/:id/mensagens', logado, async (req, res) => {
-  const p = await acessoPedido(req, res); if (!p) return;
-  const m = await all('SELECT id,autor_id,texto,criado FROM mensagens WHERE pedido_id=? ORDER BY id', p.id);
-  res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
-});
-app.post('/api/pedidos/:id/mensagens', logado, async (req, res) => {
-  const p = await acessoPedido(req, res); if (!p) return;
-  const texto = txt(req.body.texto).slice(0, 1000);
-  if (!texto) return res.status(400).json({ erro: 'Escreva uma mensagem.' });
-  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, texto, Date.now());
-  res.json({ ok: true });
-});
-app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
-  const p = await get('SELECT * FROM pedidos WHERE id=? AND loja_id=?', req.params.id, req.loja.id);
-  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
-  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido.' });
-  const st = req.body.status;
-  if (!['aprovado', 'recusado'].includes(st)) return res.status(400).json({ erro: 'Status inválido.' });
-  await run('UPDATE pedidos SET status=? WHERE id=?', st, p.id);
-  let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
-  if (st === 'recusado' && p.produto_id) await run('UPDATE produtos SET estoque=estoque+1 WHERE id=?', p.produto_id);
-  if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
-    const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-    await run('INSERT INTO vales(loja_id,codigo,valor,criado) VALUES(?,?,?,?)', req.loja.id, codigo, p.preco_original, Date.now());
-    msg += ` Código do seu vale presente: ${codigo}`;
-  }
-  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, msg, Date.now());
-  res.json({ ok: true });
-});
-
-// ---------- PAINEL ADM ----------
-app.get('/api/admin/usuarios', admin, async (req, res) =>
-  res.json(await all('SELECT u.id,u.email,u.papel,u.bloqueado,u.criado,l.nome AS loja FROM usuarios u LEFT JOIN lojas l ON l.usuario_id=u.id ORDER BY u.criado DESC')));
-app.post('/api/admin/usuarios/:id/bloqueio', admin, async (req, res) => {
-  const u = await get('SELECT * FROM usuarios WHERE id=?', req.params.id);
-  if (!u || u.papel === 'admin') return res.status(400).json({ erro: 'Não é possível alterar este usuário.' });
-  await run('UPDATE usuarios SET bloqueado=? WHERE id=?', req.body.bloqueado ? 1 : 0, u.id); res.json({ ok: true });
-});
-app.delete('/api/admin/usuarios/:id', admin, async (req, res) => {
-  const u = await get('SELECT * FROM usuarios WHERE id=?', req.params.id);
-  if (!u || u.papel === 'admin') return res.status(400).json({ erro: 'Não é possível excluir este usuário.' });
-  const l = await get('SELECT id FROM lojas WHERE usuario_id=?', u.id);
-  if (l) for (const t of ['produtos', 'cupons', 'vales', 'avisos', 'pedidos']) await run(`DELETE FROM ${t} WHERE loja_id=?`, l.id);
-  await run('DELETE FROM lojas WHERE usuario_id=?', u.id);
-  await run('UPDATE pedidos SET usuario_id=NULL WHERE usuario_id=?', u.id);
-  await run('DELETE FROM usuarios WHERE id=?', u.id); res.json({ ok: true });
-});
-app.get('/api/admin/relatorio', admin, async (req, res) => res.json(await relatorio(null)));
-
-// ---------- SITE ----------
-const PUBLIC = path.join(__dirname, 'public');
-app.use(express.static(PUBLIC));
-app.get('/', (req, res) => {
-  const f = path.join(PUBLIC, 'index.html');
-  fs.existsSync(f) ? res.sendFile(f) : res.status(404).send('<h3>index.html não encontrado na pasta public</h3>');
-});
-app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: 'Erro interno do servidor.' }); });
-
-criarTabelas().then(() => app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000))))
-  .catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
+  con
