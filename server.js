@@ -278,4 +278,71 @@ async function acessoPedido(req, res) {   // só o comprador e o vendedor da loj
   res.status(404).json({ erro: 'Pedido não encontrado.' }); return null;
 }
 app.put('/api/pedidos/:id/comprovante', logado, async (req, res) => {
-  con
+  const p = await get('SELECT * FROM pedidos WHERE id=? AND usuario_id=?', req.params.id, req.u.id);
+  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido pelo vendedor.' });
+  if (!ehImagem(req.body.comprovante)) return res.status(400).json({ erro: 'Anexe a foto do comprovante.' });
+  await run('UPDATE pedidos SET comprovante=? WHERE id=?', req.body.comprovante, p.id);
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, '📎 Enviei o comprovante do Pix.', Date.now());
+  res.json({ ok: true });
+});
+app.get('/api/pedidos/:id/mensagens', logado, async (req, res) => {
+  const p = await acessoPedido(req, res); if (!p) return;
+  const m = await all('SELECT id,autor_id,texto,criado FROM mensagens WHERE pedido_id=? ORDER BY id', p.id);
+  res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
+});
+app.post('/api/pedidos/:id/mensagens', logado, async (req, res) => {
+  const p = await acessoPedido(req, res); if (!p) return;
+  const texto = txt(req.body.texto).slice(0, 1000);
+  if (!texto) return res.status(400).json({ erro: 'Escreva uma mensagem.' });
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, texto, Date.now());
+  res.json({ ok: true });
+});
+app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
+  const p = await get('SELECT * FROM pedidos WHERE id=? AND loja_id=?', req.params.id, req.loja.id);
+  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido.' });
+  const st = req.body.status;
+  if (!['aprovado', 'recusado'].includes(st)) return res.status(400).json({ erro: 'Status inválido.' });
+  await run('UPDATE pedidos SET status=? WHERE id=?', st, p.id);
+  let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
+  if (st === 'recusado' && p.produto_id) await run('UPDATE produtos SET estoque=estoque+1 WHERE id=?', p.produto_id);
+  if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
+    const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', req.loja.id, codigo, p.preco_original, p.preco_original, Date.now());
+    msg += ` Código do seu vale presente: ${codigo}`;
+  }
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, msg, Date.now());
+  res.json({ ok: true });
+});
+
+// ---------- PAINEL ADM ----------
+app.get('/api/admin/usuarios', admin, async (req, res) =>
+  res.json(await all('SELECT u.id,u.email,u.papel,u.bloqueado,u.criado,l.nome AS loja FROM usuarios u LEFT JOIN lojas l ON l.usuario_id=u.id ORDER BY u.criado DESC')));
+app.post('/api/admin/usuarios/:id/bloqueio', admin, async (req, res) => {
+  const u = await get('SELECT * FROM usuarios WHERE id=?', req.params.id);
+  if (!u || u.papel === 'admin') return res.status(400).json({ erro: 'Não é possível alterar este usuário.' });
+  await run('UPDATE usuarios SET bloqueado=? WHERE id=?', req.body.bloqueado ? 1 : 0, u.id); res.json({ ok: true });
+});
+app.delete('/api/admin/usuarios/:id', admin, async (req, res) => {
+  const u = await get('SELECT * FROM usuarios WHERE id=?', req.params.id);
+  if (!u || u.papel === 'admin') return res.status(400).json({ erro: 'Não é possível excluir este usuário.' });
+  const l = await get('SELECT id FROM lojas WHERE usuario_id=?', u.id);
+  if (l) for (const t of ['produtos', 'cupons', 'vales', 'avisos', 'pedidos']) await run(`DELETE FROM ${t} WHERE loja_id=?`, l.id);
+  await run('DELETE FROM lojas WHERE usuario_id=?', u.id);
+  await run('UPDATE pedidos SET usuario_id=NULL WHERE usuario_id=?', u.id);
+  await run('DELETE FROM usuarios WHERE id=?', u.id); res.json({ ok: true });
+});
+app.get('/api/admin/relatorio', admin, async (req, res) => res.json(await relatorio(null)));
+
+// ---------- SITE ----------
+const PUBLIC = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC));
+app.get('/', (req, res) => {
+  const f = path.join(PUBLIC, 'index.html');
+  fs.existsSync(f) ? res.sendFile(f) : res.status(404).send('<h3>index.html não encontrado na pasta public</h3>');
+});
+app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: 'Erro interno do servidor.' }); });
+
+criarTabelas().then(() => app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000))))
+  .catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
