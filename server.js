@@ -53,7 +53,12 @@ async function criarTabelas() {
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_refresh_token TEXT;
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_user_id TEXT;
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_expira BIGINT;
-  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS mp_pagamento TEXT;`);
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS mp_pagamento TEXT;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS taxa_mp DOUBLE PRECISION;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS aprovado_em BIGINT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_id TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_status TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_check BIGINT;`);
 }
 
 // ---------- REGRAS ----------
@@ -313,7 +318,7 @@ app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
   if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido.' });
   const st = req.body.status;
   if (!['aprovado', 'recusado'].includes(st)) return res.status(400).json({ erro: 'Status inválido.' });
-  await run('UPDATE pedidos SET status=? WHERE id=?', st, p.id);
+  await run('UPDATE pedidos SET status=?, aprovado_em=? WHERE id=?', st, Date.now(), p.id);
   let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
   if (st === 'recusado' && p.produto_id) await run(`UPDATE produtos SET estoque=estoque+1 WHERE id=? AND classe<>'servicos'`, p.produto_id);
   if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
@@ -400,7 +405,8 @@ app.delete('/api/admin/banner-video', admin, async (req, res) => { await run('DE
 // ---------- MERCADO PAGO (cada vendedor conecta a própria conta) ----------
 const SITE_URL = (process.env.SITE_URL || '').replace(/\/$/, '');
 const MP_ID = process.env.MP_CLIENT_ID, MP_SECRET = process.env.MP_CLIENT_SECRET;
-const MP_TAXA = Math.min(Math.max(Number(process.env.MP_TAXA) || 0, 0), 50);   // % da plataforma (0 = sem taxa)
+const TAXA_SEM_ASSINATURA = Math.min(Math.max(Number(process.env.TAXA_SEM_ASSINATURA ?? 10), 0), 50);   // % cobrada de quem não assina
+const ASSIN_VALOR = 49.9;                                                                                     // assinatura mensal (R$)
 const mpPronto = () => !!(MP_ID && MP_SECRET && SITE_URL);
 const CHAVE = crypto.createHash('sha256').update(process.env.SEGREDO || 'troque-este-segredo').digest();
 const cifrar = t => { const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', CHAVE, iv);
@@ -463,7 +469,9 @@ app.post('/api/pedidos/:id/pagar-mp', logado, async (req, res) => {
     back_urls: { success: `${SITE_URL}/?pagamento=ok`, failure: `${SITE_URL}/?pagamento=erro`, pending: `${SITE_URL}/?pagamento=pendente` },
     auto_return: 'approved',
   };
-  if (MP_TAXA > 0) corpo.marketplace_fee = Number((p.preco * MP_TAXA / 100).toFixed(2));
+  const taxaPct = (await assinaturaAtiva(p.loja_id)) ? 0 : TAXA_SEM_ASSINATURA;   // assinante não paga taxa
+  const taxa = Number((p.preco * taxaPct / 100).toFixed(2));
+  if (taxa > 0) corpo.marketplace_fee = taxa;
   const r = await fetch('https://api.mercadopago.com/checkout/preferences', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(corpo) });
   const j = await r.json().catch(() => ({}));
@@ -471,6 +479,7 @@ app.post('/api/pedidos/:id/pagar-mp', logado, async (req, res) => {
     console.error('MP preferência:', r.status, JSON.stringify(j).slice(0, 300));
     return res.status(502).json({ erro: 'Não foi possível abrir o pagamento agora. Tente de novo ou fale com a loja pelo chat.' });
   }
+  await run('UPDATE pedidos SET taxa_mp=? WHERE id=?', taxa, p.id);
   res.json({ url: j.init_point });
 });
 // O Mercado Pago avisa aqui quando o pagamento muda. Não confiamos no aviso: conferimos o pagamento direto na API deles.
@@ -488,7 +497,7 @@ app.all('/api/mp/webhook', async (req, res) => {
     const j = await r.json();
     if (!r.ok || j.status !== 'approved' || String(j.external_reference) !== String(p.id) || Number(j.transaction_amount) + 0.01 < p.preco) return;
     const metodo = ({ bank_transfer: 'pix', credit_card: 'credito', debit_card: 'debito' })[j.payment_type_id] || p.metodo;
-    const ok = await get(`UPDATE pedidos SET status='aprovado', mp_pagamento=?, metodo=? WHERE id=? AND status='pendente' RETURNING id`, String(j.id), metodo, p.id);
+    const ok = await get(`UPDATE pedidos SET status='aprovado', aprovado_em=?, mp_pagamento=?, metodo=? WHERE id=? AND status='pendente' RETURNING id`, Date.now(), String(j.id), metodo, p.id);
     if (!ok) return;                           // já tinha sido aprovado (aviso repetido)
     let msg = 'Pagamento confirmado pelo Mercado Pago ✅ Pedido aprovado.';
     if (!p.produto_id) {
@@ -498,6 +507,58 @@ app.all('/api/mp/webhook', async (req, res) => {
     }
     await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, null, msg, Date.now());
   } catch (e) { console.error('Webhook MP:', e.message); }
+});
+
+// ---------- ASSINATURA DO LOJISTA (R$ 49,90/mês, vai para a conta do dono da plataforma) ----------
+const assinPronta = () => !!(process.env.MP_ACCESS_TOKEN && SITE_URL);
+const mpDono = (url, metodo = 'GET', corpo) => fetch(`https://api.mercadopago.com${url}`, { method: metodo,
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }, body: corpo ? JSON.stringify(corpo) : undefined });
+async function atualizarAssinatura(l, forcar = false) {   // confere a situação da assinatura no Mercado Pago (com cache de 10 min)
+  if (!l || !l.assin_id || !process.env.MP_ACCESS_TOKEN) return l ? l.assin_status : null;
+  if (!forcar && l.assin_check && Date.now() - l.assin_check < 10 * 60 * 1000) return l.assin_status;
+  try {
+    const r = await mpDono(`/preapproval/${encodeURIComponent(l.assin_id)}`);
+    const j = await r.json();
+    if (r.ok && j.status) { await run('UPDATE lojas SET assin_status=?, assin_check=? WHERE id=?', j.status, Date.now(), l.id); return j.status; }
+  } catch (e) { console.error('Assinatura MP:', e.message); }
+  return l.assin_status;
+}
+const assinaturaAtiva = async lojaId =>
+  (await atualizarAssinatura(await get('SELECT id,assin_id,assin_status,assin_check FROM lojas WHERE id=?', lojaId))) === 'authorized';
+app.get('/api/vendedor/assinatura', vendedor, async (req, res) => {
+  const l = await get('SELECT id,assin_id,assin_status,assin_check,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', req.loja.id);
+  const status = await atualizarAssinatura(l, true);
+  const lim = Date.now() - 7 * 24 * 3600 * 1000;
+  const resumo = await get(`SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS bruto, COALESCE(SUM(COALESCE(taxa_mp,0)),0) AS taxa,
+      COALESCE(SUM(CASE WHEN COALESCE(aprovado_em,criado) > ? THEN preco-COALESCE(taxa_mp,0) ELSE 0 END),0) AS recente,
+      COALESCE(SUM(CASE WHEN COALESCE(aprovado_em,criado) <= ? THEN preco-COALESCE(taxa_mp,0) ELSE 0 END),0) AS antigo
+    FROM pedidos WHERE loja_id=? AND status='aprovado' AND mp_pagamento IS NOT NULL`, lim, lim, req.loja.id);
+  res.json({ status: status || null, ativa: status === 'authorized', valor: ASSIN_VALOR, taxa_pct: TAXA_SEM_ASSINATURA, disponivel: assinPronta(), mp: !!l.mp, resumo });
+});
+app.post('/api/vendedor/assinatura', vendedor, async (req, res) => {
+  if (!assinPronta()) return res.status(400).json({ erro: 'A assinatura ainda não foi configurada pelo administrador do site.' });
+  const l = await get('SELECT id,assin_id,assin_status,assin_check FROM lojas WHERE id=?', req.loja.id);
+  if ((await atualizarAssinatura(l, true)) === 'authorized') return res.status(400).json({ erro: 'Sua assinatura já está ativa.' });
+  const emailMp = txt(req.body.email_mp || req.u.email).toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(emailMp)) return res.status(400).json({ erro: 'Informe o e-mail da sua conta do Mercado Pago.' });
+  const r = await mpDono('/preapproval', 'POST', { reason: 'Assinatura Kivra - plano lojista', external_reference: `loja-${req.loja.id}`, payer_email: emailMp,
+    auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: ASSIN_VALOR, currency_id: 'BRL' },
+    back_url: `${SITE_URL}/?assinatura=retorno`, status: 'pending' });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.init_point) {
+    console.error('MP assinatura:', r.status, JSON.stringify(j).slice(0, 300));
+    return res.status(502).json({ erro: 'Não foi possível abrir a assinatura agora. Confira o e-mail da conta do Mercado Pago e tente de novo.' });
+  }
+  await run('UPDATE lojas SET assin_id=?, assin_status=?, assin_check=? WHERE id=?', String(j.id), j.status || 'pending', Date.now(), req.loja.id);
+  res.json({ url: j.init_point });
+});
+app.post('/api/vendedor/assinatura/cancelar', vendedor, async (req, res) => {
+  const l = await get('SELECT id,assin_id FROM lojas WHERE id=?', req.loja.id);
+  if (!l || !l.assin_id) return res.status(400).json({ erro: 'Você não tem assinatura.' });
+  const r = await mpDono(`/preapproval/${encodeURIComponent(l.assin_id)}`, 'PUT', { status: 'cancelled' });
+  if (!r.ok) return res.status(502).json({ erro: 'Não foi possível cancelar agora. Tente de novo.' });
+  await run('UPDATE lojas SET assin_status=?, assin_check=? WHERE id=?', 'cancelled', Date.now(), l.id);
+  res.json({ ok: true });
 });
 
 // ---------- SITE ----------
