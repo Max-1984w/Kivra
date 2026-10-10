@@ -48,7 +48,7 @@ a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
 .app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#1c2511,#5f7a3d);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do site.</div>
+<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do app, compras feitas para fora do pais não seram reembolsadas</div>
 <nav id="nav"></nav><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
@@ -620,3 +620,15 @@ const A={
  delprod:async d=>{if(confirm('Excluir produto?')){await api('/api/vendedor/produtos/'+d.id,'DELETE');tProd()}},
  addcup:async()=>{await api('/api/vendedor/cupons','POST',{codigo:val('cc'),tipo:val('ct'),valor:val('cv').replace(',','.')});tCup()},
  delcup:async d=>{await api('/api/vendedor/cupons/'+d.id,'DELETE');tCup()},
+ addvale:async()=>{const r=await api('/api/vendedor/vales','POST',{valor:val('vv')});alert('Vale emitido! Código: '+r.codigo);tVale()},
+ addavi:async()=>{await api('/api/vendedor/avisos','POST',{tipo:val('at'),titulo:val('ati'),texto:$('#atx').value});$('#er').textContent='Publicado ✔'},
+ bloq:async d=>{await api(`/api/admin/usuarios/${d.id}/bloqueio`,'POST',{bloqueado:d.b=='1'});vAdm()},
+ deluser:async d=>{if(confirm('Excluir este usuário e os dados dele?')){await api('/api/admin/usuarios/'+d.id,'DELETE');vAdm()}},
+};
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
+ try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
+document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
+document.addEventListener('input',e=>{if(e.target.id=='pr'){const c=parseInt(digits(e.target.value)||'0',10);e.target.value='R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}if(e.target.id=='pq'&&cidLista)cidLista(e.target.value)});
+document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
+init();
+</script></body></html>
