@@ -48,7 +48,12 @@ async function criarTabelas() {
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS estado TEXT;
   ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS loja_id INTEGER;
   ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS cliente_id INTEGER;
-  CREATE TABLE IF NOT EXISTS banner_video(id INTEGER PRIMARY KEY, mime TEXT, dados BYTEA, versao BIGINT);`);
+  CREATE TABLE IF NOT EXISTS banner_video(id INTEGER PRIMARY KEY, mime TEXT, dados BYTEA, versao BIGINT);
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_access_token TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_refresh_token TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_user_id TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS mp_expira BIGINT;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS mp_pagamento TEXT;`);
 }
 
 // ---------- REGRAS ----------
@@ -83,7 +88,7 @@ app.use(async (req, res, next) => {
 const logado = (req, res, next) => req.u ? next() : res.status(401).json({ erro: 'Entre na sua conta.' });
 const vendedor = async (req, res, next) => {
   if (!req.u || req.u.papel !== 'vendedor') return res.status(403).json({ erro: 'Apenas vendedores.' });
-  req.loja = await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix FROM lojas WHERE usuario_id=?', req.u.id); next();
+  req.loja = await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id); next();
 };
 const admin = (req, res, next) =>
   req.u && req.u.papel === 'admin' && req.u.email === ADMIN_EMAIL ? next() : res.status(403).json({ erro: 'Acesso negado.' });
@@ -117,7 +122,7 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 app.get('/api/eu', async (req, res) => {
   if (!req.u) return res.json({ logado: false });
-  const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix FROM lojas WHERE usuario_id=?', req.u.id) : null;
+  const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id) : null;
   res.json({ logado: true, email: req.u.email, papel: req.u.papel, loja });
 });
 
@@ -262,11 +267,11 @@ app.post('/api/pedidos', logado, async (req, res) => {
     ehVale ? null : txt(b.numero), ehVale ? null : b.estado, digits(b.telefone), null, Date.now());
   if (produto_id) await run(`UPDATE produtos SET estoque=estoque-1 WHERE id=? AND classe<>'servicos'`, produto_id);
   if (vale) await run('UPDATE vales SET saldo=saldo-?, usado=CASE WHEN saldo-?<=0.001 THEN 1 ELSE 0 END WHERE id=?', valeUsado, valeUsado, vale.id);
-  const l = await get('SELECT whatsapp,pix FROM lojas WHERE id=?', loja_id);
-  res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix });
+  const l = await get('SELECT whatsapp,pix,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', loja_id);
+  res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix, mp: !!l.mp && mpPronto() });
 });
 app.get('/api/meus-pedidos', logado, async (req, res) =>
-  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,l.nome AS loja_nome
+  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,l.nome AS loja_nome,(l.mp_access_token IS NOT NULL) AS mp
                       FROM pedidos p LEFT JOIN lojas l ON l.id=p.loja_id WHERE p.usuario_id=? ORDER BY p.criado DESC`, req.u.id)));
 
 // ---------- COMPROVANTE, APROVAÇÃO E CHAT ----------
@@ -391,6 +396,109 @@ app.post('/api/admin/banner-video', admin, async (req, res) => {
   res.json({ ok: true });
 });
 app.delete('/api/admin/banner-video', admin, async (req, res) => { await run('DELETE FROM banner_video WHERE id=1'); res.json({ ok: true }); });
+
+// ---------- MERCADO PAGO (cada vendedor conecta a própria conta) ----------
+const SITE_URL = (process.env.SITE_URL || '').replace(/\/$/, '');
+const MP_ID = process.env.MP_CLIENT_ID, MP_SECRET = process.env.MP_CLIENT_SECRET;
+const MP_TAXA = Math.min(Math.max(Number(process.env.MP_TAXA) || 0, 0), 50);   // % da plataforma (0 = sem taxa)
+const mpPronto = () => !!(MP_ID && MP_SECRET && SITE_URL);
+const CHAVE = crypto.createHash('sha256').update(process.env.SEGREDO || 'troque-este-segredo').digest();
+const cifrar = t => { const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', CHAVE, iv);
+  const e = Buffer.concat([c.update(String(t), 'utf8'), c.final()]); return [iv, c.getAuthTag(), e].map(b => b.toString('base64')).join('.'); };
+const decifrar = t => { const [iv, tag, e] = String(t).split('.').map(x => Buffer.from(x, 'base64'));
+  const d = crypto.createDecipheriv('aes-256-gcm', CHAVE, iv); d.setAuthTag(tag); return Buffer.concat([d.update(e), d.final()]).toString('utf8'); };
+async function mpToken(params) {
+  const r = await fetch('https://api.mercadopago.com/oauth/token', { method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: new URLSearchParams({ client_id: MP_ID, client_secret: MP_SECRET, ...params }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error('Mercado Pago recusou a autorização (' + r.status + ')');
+  return j;
+}
+const salvarTokens = (lojaId, j) => run('UPDATE lojas SET mp_access_token=?, mp_refresh_token=?, mp_user_id=?, mp_expira=? WHERE id=?',
+  cifrar(j.access_token), j.refresh_token ? cifrar(j.refresh_token) : null, String(j.user_id || ''), Date.now() + (j.expires_in || 15552000) * 1000, lojaId);
+async function tokenLoja(lojaId) {            // devolve o token do vendedor, renovando quando está perto de vencer
+  const l = await get('SELECT id,mp_access_token,mp_refresh_token,mp_expira FROM lojas WHERE id=?', lojaId);
+  if (!l || !l.mp_access_token) return null;
+  try {
+    if (l.mp_expira && l.mp_refresh_token && Date.now() > l.mp_expira - 7 * 24 * 3600 * 1000) {
+      const j = await mpToken({ grant_type: 'refresh_token', refresh_token: decifrar(l.mp_refresh_token) });
+      await salvarTokens(l.id, j); return j.access_token;
+    }
+    return decifrar(l.mp_access_token);
+  } catch (e) { console.error('Token Mercado Pago:', e.message); return null; }
+}
+app.get('/api/vendedor/mp/conectar', vendedor, async (req, res) => {
+  if (!mpPronto()) return res.status(400).json({ erro: 'O Mercado Pago ainda não foi configurado pelo administrador do site.' });
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.mpState = state;
+  const url = `https://auth.mercadopago.com.br/authorization?client_id=${MP_ID}&response_type=code&platform_id=mp&state=${state}&redirect_uri=${encodeURIComponent(SITE_URL + '/api/mp/callback')}`;
+  req.session.save(() => res.json({ url }));
+});
+app.get('/api/mp/callback', async (req, res) => {
+  const { code, state } = req.query;
+  if (!req.u || req.u.papel !== 'vendedor' || !code || !state || state !== req.session.mpState) return res.redirect('/?mp=erro');
+  req.session.mpState = null;
+  try {
+    const loja = await get('SELECT id FROM lojas WHERE usuario_id=?', req.u.id);
+    await salvarTokens(loja.id, await mpToken({ grant_type: 'authorization_code', code, redirect_uri: SITE_URL + '/api/mp/callback' }));
+    res.redirect('/?mp=ok');
+  } catch (e) { console.error('Callback MP:', e.message); res.redirect('/?mp=erro'); }
+});
+app.post('/api/vendedor/mp/desconectar', vendedor, async (req, res) => {
+  await run('UPDATE lojas SET mp_access_token=NULL, mp_refresh_token=NULL, mp_user_id=NULL, mp_expira=NULL WHERE id=?', req.loja.id);
+  res.json({ ok: true });
+});
+app.post('/api/pedidos/:id/pagar-mp', logado, async (req, res) => {
+  const p = await get('SELECT * FROM pedidos WHERE id=? AND usuario_id=?', req.params.id, req.u.id);
+  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (p.status !== 'pendente') return res.status(400).json({ erro: 'Este pedido já foi decidido.' });
+  if (!(p.preco > 0)) return res.status(400).json({ erro: 'Este pedido não tem valor a pagar. O vendedor vai aprová-lo.' });
+  const token = mpPronto() ? await tokenLoja(p.loja_id) : null;
+  if (!token) return res.status(400).json({ erro: 'Esta loja ainda não aceita pagamento online. Combine com o vendedor pelo chat.' });
+  const corpo = {
+    items: [{ id: String(p.id), title: String(p.item).slice(0, 120), quantity: 1, currency_id: 'BRL', unit_price: Number(Number(p.preco).toFixed(2)) }],
+    external_reference: String(p.id),
+    notification_url: `${SITE_URL}/api/mp/webhook?pedido=${p.id}`,
+    back_urls: { success: `${SITE_URL}/?pagamento=ok`, failure: `${SITE_URL}/?pagamento=erro`, pending: `${SITE_URL}/?pagamento=pendente` },
+    auto_return: 'approved',
+  };
+  if (MP_TAXA > 0) corpo.marketplace_fee = Number((p.preco * MP_TAXA / 100).toFixed(2));
+  const r = await fetch('https://api.mercadopago.com/checkout/preferences', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(corpo) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.init_point) {
+    console.error('MP preferência:', r.status, JSON.stringify(j).slice(0, 300));
+    return res.status(502).json({ erro: 'Não foi possível abrir o pagamento agora. Tente de novo ou fale com a loja pelo chat.' });
+  }
+  res.json({ url: j.init_point });
+});
+// O Mercado Pago avisa aqui quando o pagamento muda. Não confiamos no aviso: conferimos o pagamento direto na API deles.
+app.all('/api/mp/webhook', async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const pedidoId = Number(req.query.pedido);
+    const pagId = req.query['data.id'] || req.query.id || (req.body && req.body.data && req.body.data.id);
+    const tipo = req.query.type || req.query.topic || (req.body && req.body.type);
+    if (!pedidoId || !pagId || (tipo && tipo !== 'payment')) return;
+    const p = await get('SELECT * FROM pedidos WHERE id=?', pedidoId);
+    if (!p || p.status !== 'pendente') return;
+    const token = await tokenLoja(p.loja_id); if (!token) return;
+    const r = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(pagId)}`, { headers: { Authorization: `Bearer ${token}` } });
+    const j = await r.json();
+    if (!r.ok || j.status !== 'approved' || String(j.external_reference) !== String(p.id) || Number(j.transaction_amount) + 0.01 < p.preco) return;
+    const metodo = ({ bank_transfer: 'pix', credit_card: 'credito', debit_card: 'debito' })[j.payment_type_id] || p.metodo;
+    const ok = await get(`UPDATE pedidos SET status='aprovado', mp_pagamento=?, metodo=? WHERE id=? AND status='pendente' RETURNING id`, String(j.id), metodo, p.id);
+    if (!ok) return;                           // já tinha sido aprovado (aviso repetido)
+    let msg = 'Pagamento confirmado pelo Mercado Pago ✅ Pedido aprovado.';
+    if (!p.produto_id) {
+      const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', p.loja_id, codigo, p.preco_original, p.preco_original, Date.now());
+      msg += ` Código do seu vale presente: ${codigo}`;
+    }
+    await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, null, msg, Date.now());
+  } catch (e) { console.error('Webhook MP:', e.message); }
+});
 
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
