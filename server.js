@@ -45,11 +45,14 @@ async function criarTabelas() {
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aceite_politica BIGINT;
   ALTER TABLE vales ADD COLUMN IF NOT EXISTS saldo DOUBLE PRECISION;
   UPDATE vales SET saldo = CASE WHEN usado=1 THEN 0 ELSE valor END WHERE saldo IS NULL;
-  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS estado TEXT;`);
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS estado TEXT;
+  ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS loja_id INTEGER;
+  ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS cliente_id INTEGER;
+  CREATE TABLE IF NOT EXISTS banner_video(id INTEGER PRIMARY KEY, mime TEXT, dados BYTEA, versao BIGINT);`);
 }
 
 // ---------- REGRAS ----------
-const CLASSES = { roupas: ['tamanho'], calcados: ['tamanho'], bolsas: [], perfumes: ['nome'], cosmeticos: ['nome'] };
+const CLASSES = { roupas: ['tamanho'], calcados: ['tamanho'], bolsas: [], perfumes: ['nome'], cosmeticos: ['nome'], servicos: [] };
 const VALES = [10, 30, 50, 70, 100, 200, 250, 300, 400, 500];
 const MAX_CUPOM = 50;
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
@@ -65,6 +68,7 @@ const slugar = s => txt(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036
 
 const app = express();
 app.set('trust proxy', 1);
+app.use('/api/admin/banner-video', express.json({ limit: '20mb' })); // só o vídeo do ADM aceita corpo grande
 app.use(express.json({ limit: '6mb' }));
 app.use(session({
   store: new PgSession({ pool, createTableIfMissing: true }), // login guardado no Supabase
@@ -160,9 +164,9 @@ app.post('/api/vendedor/produtos', vendedor, async (req, res) => {
   for (const c of CLASSES[classe]) if (!d[c]) return res.status(400).json({ erro: `Informe o campo: ${c}.` });
   if (!txt(descricao)) return res.status(400).json({ erro: 'Informe a descrição.' });
   if (!(Number(preco) > 0)) return res.status(400).json({ erro: 'Preço inválido.' });
-  if (!ehImagem(foto)) return res.status(400).json({ erro: 'Adicione a foto.' });
+  if (classe !== 'servicos' && !ehImagem(foto)) return res.status(400).json({ erro: 'Adicione a foto.' });
   await run('INSERT INTO produtos(loja_id,classe,nome,tamanho,descricao,preco,estoque,foto,criado) VALUES(?,?,?,?,?,?,?,?,?)',
-    req.loja.id, classe, d.nome, d.tamanho, txt(descricao), Number(preco), Math.max(1, parseInt(estoque) || 1), foto, Date.now());
+    req.loja.id, classe, d.nome, d.tamanho, txt(descricao), Number(preco), classe === 'servicos' ? 1 : Math.max(1, parseInt(estoque) || 1), ehImagem(foto) ? foto : null, Date.now());
   res.json({ ok: true });
 });
 app.put('/api/vendedor/produtos/:id/estoque', vendedor, async (req, res) => {
@@ -256,7 +260,7 @@ app.post('/api/pedidos', logado, async (req, res) => {
     loja_id, req.u.id, req.ip, produto_id, item, preco, desconto, final, cupom, b.metodo, txt(b.nome),
     ehVale ? null : digits(b.cep), ehVale ? null : txt(b.cidade), ehVale ? null : txt(b.bairro), ehVale ? null : txt(b.rua),
     ehVale ? null : txt(b.numero), ehVale ? null : b.estado, digits(b.telefone), null, Date.now());
-  if (produto_id) await run('UPDATE produtos SET estoque=estoque-1 WHERE id=?', produto_id);
+  if (produto_id) await run(`UPDATE produtos SET estoque=estoque-1 WHERE id=? AND classe<>'servicos'`, produto_id);
   if (vale) await run('UPDATE vales SET saldo=saldo-?, usado=CASE WHEN saldo-?<=0.001 THEN 1 ELSE 0 END WHERE id=?', valeUsado, valeUsado, vale.id);
   const l = await get('SELECT whatsapp,pix FROM lojas WHERE id=?', loja_id);
   res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix });
@@ -306,7 +310,7 @@ app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
   if (!['aprovado', 'recusado'].includes(st)) return res.status(400).json({ erro: 'Status inválido.' });
   await run('UPDATE pedidos SET status=? WHERE id=?', st, p.id);
   let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
-  if (st === 'recusado' && p.produto_id) await run('UPDATE produtos SET estoque=estoque+1 WHERE id=?', p.produto_id);
+  if (st === 'recusado' && p.produto_id) await run(`UPDATE produtos SET estoque=estoque+1 WHERE id=? AND classe<>'servicos'`, p.produto_id);
   if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
     const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
     await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', req.loja.id, codigo, p.preco_original, p.preco_original, Date.now());
@@ -334,6 +338,59 @@ app.delete('/api/admin/usuarios/:id', admin, async (req, res) => {
   await run('DELETE FROM usuarios WHERE id=?', u.id); res.json({ ok: true });
 });
 app.get('/api/admin/relatorio', admin, async (req, res) => res.json(await relatorio(null)));
+
+// ---------- CHAT COM A LOJA (antes de comprar) ----------
+const msgsLoja = async (req, res, lojaId, clienteId) => {
+  const m = await all('SELECT id,autor_id,texto,criado FROM mensagens WHERE loja_id=? AND cliente_id=? AND pedido_id IS NULL ORDER BY id', lojaId, clienteId);
+  res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
+};
+const enviaLoja = async (req, res, lojaId, clienteId) => {
+  const texto = txt(req.body.texto).slice(0, 1000);
+  if (!texto) return res.status(400).json({ erro: 'Escreva uma mensagem.' });
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado,loja_id,cliente_id) VALUES(NULL,?,?,?,?,?)', req.u.id, texto, Date.now(), lojaId, clienteId);
+  res.json({ ok: true });
+};
+app.get('/api/lojas/:id/mensagens', logado, async (req, res) => msgsLoja(req, res, Number(req.params.id), req.u.id));
+app.post('/api/lojas/:id/mensagens', logado, async (req, res) => {
+  if (!(await get('SELECT 1 AS x FROM lojas WHERE id=?', req.params.id))) return res.status(404).json({ erro: 'Loja não encontrada.' });
+  await enviaLoja(req, res, Number(req.params.id), req.u.id);
+});
+app.get('/api/vendedor/conversas', vendedor, async (req, res) => res.json(await all(
+  `SELECT m.cliente_id, u.email, MAX(m.criado) AS ultima FROM mensagens m JOIN usuarios u ON u.id=m.cliente_id
+   WHERE m.loja_id=? AND m.pedido_id IS NULL GROUP BY m.cliente_id, u.email ORDER BY ultima DESC`, req.loja.id)));
+app.get('/api/vendedor/conversas/:cid/mensagens', vendedor, async (req, res) => msgsLoja(req, res, req.loja.id, Number(req.params.cid)));
+app.post('/api/vendedor/conversas/:cid/mensagens', vendedor, async (req, res) => enviaLoja(req, res, req.loja.id, Number(req.params.cid)));
+
+// ---------- VÍDEO DO BANNER INICIAL (só o ADM envia) ----------
+app.get('/api/banner/info', async (req, res) => {
+  const v = await get('SELECT versao FROM banner_video WHERE id=1');
+  res.json({ video: !!v, versao: v ? v.versao : 0 });
+});
+app.get('/api/banner/video', async (req, res) => {
+  const v = await get('SELECT mime,dados FROM banner_video WHERE id=1');
+  if (!v) return res.status(404).end();
+  const buf = v.dados, total = buf.length, r = req.headers.range;
+  res.set({ 'Content-Type': v.mime, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=3600' });
+  if (r) {                                   // iPhone/Safari só toca vídeo com suporte a "Range"
+    const m = /bytes=(\d*)-(\d*)/.exec(r) || [];
+    let a = m[1] ? parseInt(m[1]) : 0, b = m[2] ? parseInt(m[2]) : total - 1;
+    if (!m[1] && m[2]) { a = total - parseInt(m[2]); b = total - 1; }
+    b = Math.min(b, total - 1);
+    if (!(a >= 0) || a > b) return res.status(416).set('Content-Range', `bytes */${total}`).end();
+    res.status(206).set({ 'Content-Range': `bytes ${a}-${b}/${total}`, 'Content-Length': b - a + 1 });
+    return res.end(buf.subarray(a, b + 1));
+  }
+  res.set('Content-Length', total); res.end(buf);
+});
+app.post('/api/admin/banner-video', admin, async (req, res) => {
+  const v = String(req.body.video || ''), i = v.indexOf(';base64,'), mime = v.slice(5, i);
+  if (!v.startsWith('data:video/') || i < 0 || !['video/mp4', 'video/webm'].includes(mime)) return res.status(400).json({ erro: 'Envie um vídeo MP4 ou WebM.' });
+  const dados = Buffer.from(v.slice(i + 8), 'base64');
+  if (dados.length > 12 * 1024 * 1024) return res.status(400).json({ erro: 'Vídeo grande demais (máximo 12 MB). Use um vídeo curto.' });
+  await run('INSERT INTO banner_video(id,mime,dados,versao) VALUES(1,?,?,?) ON CONFLICT (id) DO UPDATE SET mime=EXCLUDED.mime, dados=EXCLUDED.dados, versao=EXCLUDED.versao', mime, dados, Date.now());
+  res.json({ ok: true });
+});
+app.delete('/api/admin/banner-video', admin, async (req, res) => { await run('DELETE FROM banner_video WHERE id=1'); res.json({ ok: true }); });
 
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
