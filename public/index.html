@@ -81,7 +81,12 @@ function nav(){
   (eu.logado?bt('sair','Sair'):bt('area','Entrar / Criar conta','data-ar="cliente"')+bt('area','🏪 Área do vendedor','data-ar="vendedor"','p'));
 }
 async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
-async function init(){try{eu=await api('/api/eu')}catch(e){}const l=new URLSearchParams(location.search).get('loja');l?go('loja',l):go('inicio')}
+async function init(){try{eu=await api('/api/eu')}catch(e){}
+ const q=new URLSearchParams(location.search),l=q.get('loja'),mp=q.get('mp'),pg=q.get('pagamento');
+ history.replaceState(null,'',location.pathname+(l?'?loja='+encodeURIComponent(l):''));
+ if(mp){alert(mp=='ok'?'Conta do Mercado Pago conectada! Seus clientes já podem pagar online.':'Não foi possível conectar o Mercado Pago. Tente de novo.');return go(eu.papel=='vendedor'?'vend':'inicio')}
+ if(pg){alert(pg=='ok'?'Pagamento recebido! O pedido é aprovado automaticamente quando o Mercado Pago confirmar.':pg=='pendente'?'Pagamento pendente. Assim que for confirmado, o pedido é aprovado.':'O pagamento não foi concluído. Você pode tentar de novo em Meus pedidos.');return go(eu.logado?'meus':'inicio')}
+ l?go('loja',l):go('inicio')}
 
 /* ---------- vitrine ---------- */
 function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
@@ -126,7 +131,7 @@ async function vLoja(){
 }
 async function vMeus(){
  const o=await api('/api/meus-pedidos');
- app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span><br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
+ app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span><br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}${x.mp&&x.status=='pendente'&&x.preco>0?bt('pagarmp','Pagar com Mercado Pago',`data-id="${x.id}"`,'p'):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
 }
 function pedido(it){
  cur={it};
@@ -136,9 +141,10 @@ function pedido(it){
 }
 function fin(r,it,m){
  cur.pid=r.id;
+ const mp=r.mp&&r.total>0?`<div class="box"><b>Pagar agora pelo Mercado Pago</b><p class="mut">Pix, cartão de crédito ou débito. O pedido é aprovado automaticamente quando o pagamento for confirmado.</p>${bt('pagarmp','Pagar com Mercado Pago',`data-id="${r.id}"`,'p')}</div><p class="mut">Ou, se preferir, combine direto com o vendedor:</p>`:'';
  const pg=m=='pix'?(r.pix?`<div class="box"><div class="mut">Chave Pix do vendedor</div><div style="font-size:18px;font-weight:700;word-break:break-all;margin:6px 0">${esc(r.pix)}</div>${bt('copiarpix','Copiar chave',`data-l="${esc(r.pix)}"`,'p')}</div><label>Depois de pagar, anexe a foto do comprovante</label><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div>${bt('comp','Enviar comprovante',`data-id="${r.id}"`,'p')}`:'<div class="box">O vendedor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</div>')
   :`<div class="box"><b>Pagamento no cartão de ${m=='credito'?'crédito':'débito'}</b><p>Entre em contato com o vendedor para acertar o pagamento. Quando vocês combinarem, ele aprova o seu pedido.</p></div>`;
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${mp}${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
 }
 async function chat(url,tit){
  clearInterval(ct);
@@ -520,7 +526,8 @@ async function vVend(){
 function tLoja(){
  const l=eu.loja,link=location.origin+'/?loja='+l.slug;
  $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Foto de perfil da loja (deixe vazio para manter a atual)</label><input id="av" type="file" accept="image/*"><label>Banner da loja (deixe vazio para manter o atual)</label><input id="bn" type="file" accept="image/*"><label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('px','Chave Pix',l.pix)}<div class="err" id="er"></div><div class="row">${bt('salvarloja','Salvar','','p')}${bt('go','Ver minha loja',`data-v="loja" data-a="${l.slug}"`)}</div></div>
- <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}${bt('compartilhar','Compartilhar',`data-l="${esc(link)}"`)}</div></div>`;
+ <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}${bt('compartilhar','Compartilhar',`data-l="${esc(link)}"`)}</div></div>
+ <div class="box" style="max-width:520px"><b>Receber pelo Mercado Pago</b><p class="mut">Conecte a sua conta para o cliente pagar com Pix, crédito ou débito e o pedido ser aprovado automaticamente. O dinheiro vai direto para a sua conta do Mercado Pago.</p>${l.mp_conectado?`<p>✅ Conta conectada.</p>${bt('mpdesc','Desconectar')}`:bt('mpconectar','Conectar minha conta do Mercado Pago','','p')}</div>`;
 }
 async function tProd(){
  const l=await api('/api/vendedor/produtos');
@@ -561,6 +568,9 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ pagarmp:async d=>{const r=await api(`/api/pedidos/${d.id}/pagar-mp`,'POST');location.href=r.url},
+ mpconectar:async()=>{const r=await api('/api/vendedor/mp/conectar');location.href=r.url},
+ mpdesc:async()=>{if(confirm('Desconectar o Mercado Pago? Os clientes voltam a pagar combinando com você.')){await api('/api/vendedor/mp/desconectar','POST');eu=await api('/api/eu');tLoja()}},
  upvideo:async()=>{const f=$('#vd').files[0];if(!f)throw new Error('Escolha um vídeo.');if(f.size>12*1024*1024)throw new Error('Vídeo grande demais (máximo 12 MB).');
   const d=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)});
   $('#er').textContent='Enviando...';await api('/api/admin/banner-video','POST',{video:d});vAdm()},
