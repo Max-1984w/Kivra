@@ -82,10 +82,11 @@ function nav(){
 }
 async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
 async function init(){try{eu=await api('/api/eu')}catch(e){}
- const q=new URLSearchParams(location.search),l=q.get('loja'),mp=q.get('mp'),pg=q.get('pagamento');
+ const q=new URLSearchParams(location.search),l=q.get('loja'),mp=q.get('mp'),pg=q.get('pagamento'),ass=q.get('assinatura');
  history.replaceState(null,'',location.pathname+(l?'?loja='+encodeURIComponent(l):''));
  if(mp){alert(mp=='ok'?'Conta do Mercado Pago conectada! Seus clientes já podem pagar online.':'Não foi possível conectar o Mercado Pago. Tente de novo.');return go(eu.papel=='vendedor'?'vend':'inicio')}
  if(pg){alert(pg=='ok'?'Pagamento recebido! O pedido é aprovado automaticamente quando o Mercado Pago confirmar.':pg=='pendente'?'Pagamento pendente. Assim que for confirmado, o pedido é aprovado.':'O pagamento não foi concluído. Você pode tentar de novo em Meus pedidos.');return go(eu.logado?'meus':'inicio')}
+ if(ass){alert('Você voltou do Mercado Pago. Se concluiu a assinatura, ela aparece como ativa em instantes.');tab='ass';return go('vend')}
  l?go('loja',l):go('inicio')}
 
 /* ---------- vitrine ---------- */
@@ -519,9 +520,9 @@ function vConta(){
 
 /* ---------- vendedor ---------- */
 async function vVend(){
- const T=[['loja','Loja'],['prod','Produtos'],['cup','Cupons'],['vale','Vales'],['avi','Avisos'],['ped','Pedidos'],['conv','Conversas'],['rel','Relatório']];
+ const T=[['loja','Loja'],['prod','Produtos'],['cup','Cupons'],['vale','Vales'],['avi','Avisos'],['ped','Pedidos'],['conv','Conversas'],['ass','Assinatura e saldo'],['rel','Relatório']];
  app.innerHTML=`<div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('tab',n,`data-t="${k}"`,tab==k?'on':'')).join('')}</div><div id="tb"></div>`;
- await({loja:tLoja,prod:tProd,cup:tCup,vale:tVale,avi:tAvi,ped:tPed,conv:tConv,rel:tRel})[tab]();
+ await({loja:tLoja,prod:tProd,cup:tCup,vale:tVale,avi:tAvi,ped:tPed,conv:tConv,ass:tAss,rel:tRel})[tab]();
 }
 function tLoja(){
  const l=eu.loja,link=location.origin+'/?loja='+l.slug;
@@ -556,6 +557,12 @@ async function tConv(){
  const l=await api('/api/vendedor/conversas');
  $('#tb').innerHTML='<p class="mut">Clientes que escreveram para a loja antes de comprar. As conversas dos pedidos ficam em Pedidos.</p>'+(l.length?l.map(x=>`<div class="box row" style="align-items:center"><div><b>${esc(x.email)}</b><div class="mut">${dt(x.ultima)}</div></div>${bt('chatconv','💬 Abrir',`data-id="${x.cliente_id}" data-t="${esc(x.email)}"`)}</div>`).join(''):'<p class="mut">Nenhuma conversa ainda.</p>');
 }
+async function tAss(){
+ const a=await api('/api/vendedor/assinatura'),s=a.resumo;
+ const st={authorized:'✅ Ativa',pending:'⏳ Aguardando confirmação',paused:'⏸ Pausada',cancelled:'❌ Cancelada'}[a.status]||'Sem assinatura';
+ $('#tb').innerHTML=`<div class="box" style="max-width:560px"><b>Plano lojista · ${brl(a.valor)} por mês</b><p class="mut">Com a assinatura ativa, a Kivra não cobra taxa sobre as suas vendas. Sem assinatura, a Kivra cobra ${a.taxa_pct}% de cada venda paga pelo Mercado Pago.</p><p>Situação: <b>${st}</b></p>${a.ativa?bt('assdesc','Cancelar assinatura'):a.disponivel?`${inp('am','E-mail da sua conta do Mercado Pago',eu.email,'type="email"')}<div class="err" id="er"></div>${bt('assinar','Assinar por '+brl(a.valor)+' por mês','','p')}`:'<p class="mut">A assinatura ainda não está disponível.</p>'}</div>
+ <div class="box sc" style="max-width:560px"><b>Vendas pagas pelo Mercado Pago</b>${a.mp?'':'<p class="mut">Conecte sua conta do Mercado Pago na aba Loja para vender com pagamento online.</p>'}<table><tr><td>Vendas aprovadas</td><td>${s.n}</td></tr><tr><td>Valor das vendas</td><td>${brl(s.bruto)}</td></tr><tr><td>Taxa da Kivra</td><td>− ${brl(s.taxa)}</td></tr><tr><td><b>Líquido</b></td><td><b>${brl(s.bruto-s.taxa)}</b></td></tr><tr><td>Aprovadas nos últimos 7 dias</td><td>${brl(s.recente)}</td></tr><tr><td>Aprovadas há mais de 7 dias</td><td>${brl(s.antigo)}</td></tr></table><p class="mut">Estes valores vêm dos pedidos registrados no Kivra. O dinheiro fica na sua conta do Mercado Pago, que decide quando ele é liberado para saque (veja em Atividade, no app do Mercado Pago). A Kivra não guarda o seu dinheiro.</p></div>`;
+}
 async function tRel(){$('#tb').innerHTML=relTab(await api('/api/vendedor/relatorio'))}
 const relTab=r=>`<div class="box sc"><table><tr><th>Período</th><th>Vendas</th><th>Total</th></tr>${[['mes','Mês'],['bimestre','Bimestre'],['trimestre','Trimestre'],['ano','Ano']].map(([k,n])=>`<tr><td>${n}</td><td>${r[k].vendas}</td><td>${brl(r[k].total)}</td></tr>`).join('')}</table></div>`;
 
@@ -568,6 +575,8 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ assinar:async()=>{const r=await api('/api/vendedor/assinatura','POST',{email_mp:val('am')});location.href=r.url},
+ assdesc:async()=>{if(confirm('Cancelar a assinatura? A taxa de '+10+'% volta a valer nas próximas vendas.')){await api('/api/vendedor/assinatura/cancelar','POST');tAss()}},
  pagarmp:async d=>{const r=await api(`/api/pedidos/${d.id}/pagar-mp`,'POST');location.href=r.url},
  mpconectar:async()=>{const r=await api('/api/vendedor/mp/conectar');location.href=r.url},
  mpdesc:async()=>{if(confirm('Desconectar o Mercado Pago? Os clientes voltam a pagar combinando com você.')){await api('/api/vendedor/mp/desconectar','POST');eu=await api('/api/eu');tLoja()}},
