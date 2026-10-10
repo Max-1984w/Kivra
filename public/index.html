@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kivra</title>
 <style>
-:root{color-scheme:dark;--bg:#0c0c0e;--fg:#f4f1f3;--mut:#a89aa2;--card:#17171a;--bd:#2c2429;--ac:#a8124f;--ac2:#ee5a96}
+:root{color-scheme:dark;--bg:#0b0d09;--fg:#eef2e8;--mut:#9aa68f;--card:#14180f;--bd:#262d1f;--ac:#5f7a3d;--ac2:#b9cf9c}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
 a{color:var(--ac)}
 .aviso{background:var(--ac);color:#fff;text-align:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;font-weight:600;font-size:14px}
@@ -28,29 +28,31 @@ label{font-size:13px;color:var(--mut)}
 .vale{font-size:20px;font-weight:700;padding:16px 8px}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
 .sc{overflow-x:auto}
-.ban{height:clamp(120px,28vw,240px);border-radius:14px;background:linear-gradient(120deg,#3d0820,#a8124f) center/cover;border:1px solid var(--bd)}
+.bv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
+.ph{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1c2511,#3f5229);font-weight:700;color:#dbe8c8}
+.ban{height:clamp(120px,28vw,240px);border-radius:14px;background:linear-gradient(120deg,#1c2511,#5f7a3d) center/cover;border:1px solid var(--bd)}
 .perfil{display:flex;gap:14px;align-items:flex-end;margin:-44px 16px 14px;position:relative}
 .av{width:96px;height:96px;flex:0 0 96px;border-radius:50%;border:4px solid var(--bg);object-fit:cover;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:800}
 a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
-.hero{position:relative;border-radius:14px;overflow:hidden;min-height:400px;color:#fff;background:radial-gradient(ellipse at 50% 35%,#7d1040,#0c0c0e 72%);border:1px solid var(--bd)}
-.sl{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 64px 56px;gap:12px}
+.hero{position:relative;border-radius:14px;overflow:hidden;min-height:400px;color:#fff;background:radial-gradient(ellipse at 50% 35%,#3f5229,#0c0c0e 72%);border:1px solid var(--bd)}
+.sl{position:absolute;inset:0;z-index:1;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 64px 56px;gap:12px}
 .sl.on{display:flex}
-.k{letter-spacing:.3em;font-size:13px;color:#f3c1d6}
+.k{letter-spacing:.3em;font-size:13px;color:#dbe8c8}
 .h{font-size:clamp(34px,8vw,64px);font-weight:800;line-height:1.05}
-.cp{border:1px solid #f3c1d666;border-radius:12px;padding:10px 22px;max-width:440px}
+.cp{border:1px solid #dbe8c866;border-radius:12px;padding:10px 22px;max-width:440px}
 .hb{background:#fff;color:#111;border:0;font-weight:700;letter-spacing:.08em;padding:12px 28px}
 .ar{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:#ffffff33;border:0;color:#fff;font-size:20px;padding:0;z-index:2}
 .ctl{position:absolute;left:16px;bottom:14px;display:flex;gap:8px;align-items:center;z-index:2}
 .dt{width:8px;height:8px;border-radius:50%;background:#fff6;padding:0;border:0}.dt.on{width:28px;border-radius:6px;background:#fff}
 .ps{width:28px;height:28px;border-radius:50%;background:#ffffff33;border:0;color:#fff;padding:0;font-size:12px}
-.app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#3d0820,#a8124f);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
+.app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#1c2511,#5f7a3d);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo watzzap, compras feitas para fora do pais não seram reembolsadas</div>
+<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do site.</div>
 <nav id="nav"></nav><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
-const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',vale_presente:'Vale presente'};
-const NEED={roupas:['tam'],calcados:['tam'],bolsas:[],perfumes:['nome'],cosmeticos:['nome']};
+const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
+const NEED={roupas:['tam'],calcados:['tam'],bolsas:[],perfumes:['nome'],cosmeticos:['nome'],servicos:[]};
 const $=s=>document.querySelector(s),app=$('#app');
 const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=v=>'R$ '+Number(v).toFixed(2).replace('.',',');
@@ -82,17 +84,17 @@ async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus
 async function init(){try{eu=await api('/api/eu')}catch(e){}const l=new URLSearchParams(location.search).get('loja');l?go('loja',l):go('inicio')}
 
 /* ---------- vitrine ---------- */
-function card(p,del){P[p.id]=p;return `<div class="card"><img src="${p.foto}" alt=""><div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
+function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
 let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
 function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
 async function vInicio(){
- const [av,lj]=await Promise.all([api('/api/inicio'),api('/api/lojas')]);
+ const [av,lj,bi]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info')]);
  const S=[{k:'ROUPAS • CALÇADOS • BOLSAS • PERFUMES',s:'COSMÉTICOS • VALE PRESENTE',h:'Kivra',c:'Compre direto das melhores lojas',b:'COMPRAR',v:'prod'},
   ...av.filter(a=>a.tipo=='promocao').slice(0,5).map(a=>({k:a.loja_nome.toUpperCase(),s:'PROMOÇÃO',h:a.titulo,c:a.texto,b:'VER LOJA',v:'loja',a:a.slug}))];
  const es=av.filter(a=>a.tipo=='estoque');
  sl=0;
- app.innerHTML=`<div class="hero">${S.map((x,i)=>`<div class="sl ${i?'':'on'}"><div class="k">${esc(x.k)}</div><div class="k">${esc(x.s)}</div><div class="h">${esc(x.h)}</div>${x.c?`<div class="cp">${esc(x.c)}</div>`:''}<button class="hb" data-x="go" data-v="${x.v}" ${x.a?`data-a="${x.a}"`:''}>${x.b}</button></div>`).join('')}
+ app.innerHTML=`<div class="hero">${bi.video?`<video class="bv" src="/api/banner/video?v=${bi.versao}" autoplay muted loop playsinline></video>`:''}${S.map((x,i)=>`<div class="sl ${i?'':'on'}"><div class="k">${esc(x.k)}</div><div class="k">${esc(x.s)}</div><div class="h">${esc(x.h)}</div>${x.c?`<div class="cp">${esc(x.c)}</div>`:''}<button class="hb" data-x="go" data-v="${x.v}" ${x.a?`data-a="${x.a}"`:''}>${x.b}</button></div>`).join('')}
  ${S.length>1?`<button class="ar" style="left:12px" data-x="pass" data-n="-1">‹</button><button class="ar" style="right:12px" data-x="pass" data-n="1">›</button>`:''}
  <div class="ctl">${S.map((x,i)=>`<button class="dt ${i?'':'on'}" data-x="dot" data-i="${i}"></button>`).join('')}<button class="ps" data-x="pausa">⏸</button></div></div>
  <div class="app"><div><b>Instale o app Kivra</b><div style="opacity:.85">Tenha tudo em um só lugar, no computador ou no celular.</div></div><button data-x="instalar">Instalar</button></div>
@@ -101,7 +103,7 @@ async function vInicio(){
  clearInterval(tm);tm=setInterval(()=>{if(!pausa&&view=='inicio')slide(sl+1)},5000);
 }
 async function vInicioOld(){
- const [av,lj]=await Promise.all([api('/api/inicio'),api('/api/lojas')]);
+ const [av,lj,bi]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info')]);
  app.innerHTML=`<h1 style="margin:6px 0">Kivra</h1><p class="mut">Promoções, atualizações de estoque e lojas parceiras.</p>${lj.length?`<div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}`+
  (av.length?av.map(a=>`<div class="box"><span class="tag">${a.tipo=='estoque'?'📦 Estoque':'🏷️ Promoção'}</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):'<p class="mut">Ainda não há novidades.</p>');
 }
@@ -115,12 +117,11 @@ async function vProd(){
 let lt='inicio';
 async function vLoja(){
  const [l,ps]=await Promise.all([api('/api/lojas/'+arg),api('/api/produtos?loja='+arg)]);
- const w=digits(l.whatsapp),f=l.faixa_preco||{},zap=w?`https://wa.me/55${w.replace(/^55/,'')}`:'';
- const wa=zap?`<a href="${zap}" target="_blank" rel="noopener"><button style="width:100%">Não achou o valor que queria? mande uma mensagem para ${esc(l.whatsapp)}</button></a>`:'<p class="mut">Não achou o valor que queria? O vendedor ainda não cadastrou o WhatsApp.</p>';
+ const f=l.faixa_preco||{},cb=(c='')=>bt('chatloja','💬 Conversar com a loja',`data-id="${l.id}" data-t="${esc(l.nome)}"`,c);
  const T=[['inicio','Início'],['prod','Produtos ('+ps.length+')'],['vale','Vale presente']];
  const grade=a=>a.length?`<div class="grid">${a.map(p=>card(p)).join('')}</div>`:'<p class="mut">Sem produtos no momento.</p>';
- const body=lt=='prod'?grade(ps):lt=='vale'?`<div class="grid">${l.vales.map(v=>`<button class="vale p" data-x="vale" data-loja="${l.id}" data-v="${v}">R$ ${v}</button>`).join('')}</div><br>${wa}`:
-  `<div class="box"><b>Quem somos nós?</b><p>${esc(l.quem_somos)||'<span class="mut">A loja ainda não preencheu esta seção.</span>'}</p>${f.min!=null?`<span class="tag">Produtos de ${brl(f.min)} a ${brl(f.max)}</span>`:''}</div>${ps.length?'<h3>Destaques</h3>'+grade(ps.slice(0,4)):''}${zap?`<br><a href="${zap}" target="_blank" rel="noopener"><button class="p" style="width:100%">Falar com a loja no WhatsApp</button></a>`:''}`;
+ const body=lt=='prod'?grade(ps):lt=='vale'?`<div class="grid">${l.vales.map(v=>`<button class="vale p" data-x="vale" data-loja="${l.id}" data-v="${v}">R$ ${v}</button>`).join('')}</div><p class="mut">Não achou o valor que queria? Converse com a loja:</p>${cb()}`:
+  `<div class="box"><b>Quem somos nós?</b><p>${esc(l.quem_somos)||'<span class="mut">A loja ainda não preencheu esta seção.</span>'}</p>${f.min!=null?`<span class="tag">Produtos de ${brl(f.min)} a ${brl(f.max)}</span>`:''}</div>${ps.length?'<h3>Destaques</h3>'+grade(ps.slice(0,4)):''}<br>${cb('p')}`;
  app.innerHTML=`<div class="ban" ${l.banner?`style="background-image:url('${l.banner}')"`:''}></div><div class="perfil">${l.avatar?`<img class="av" src="${l.avatar}" alt="">`:`<div class="av">${esc(l.nome.charAt(0).toUpperCase())}</div>`}<div><h2 style="margin:0">${esc(l.nome)}</h2><span class="mut">${ps.length} produtos</span></div></div><div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('ltab',n,`data-t="${k}"`,lt==k?'on':'')).join('')}</div>${body}`;
 }
 async function vMeus(){
@@ -134,15 +135,15 @@ function pedido(it){
  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Finalizar pedido</h3><div class="mut">${esc(it.nome)} · ${brl(it.preco)}</div><br><label>Forma de pagamento</label><select id="f_m"><option value="pix">Pix</option><option value="credito">Cartão de crédito</option><option value="debito">Cartão de débito</option></select>${inp('f_n','Nome completo')}${inp('f_te','Telefone com DDD','','inputmode="tel"')}${end}<div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('enviar','Continuar','','p')}</div></div></div>`;
 }
 function fin(r,it,m){
- cur.pid=r.id;const w=digits(r.whatsapp),zap=w?`https://wa.me/55${w.replace(/^55/,'')}?text=${encodeURIComponent(`Olá! Fiz o pedido #${r.id}: ${it.nome} (${brl(r.total)}).`)}`:'';
+ cur.pid=r.id;
  const pg=m=='pix'?(r.pix?`<div class="box"><div class="mut">Chave Pix do vendedor</div><div style="font-size:18px;font-weight:700;word-break:break-all;margin:6px 0">${esc(r.pix)}</div>${bt('copiarpix','Copiar chave',`data-l="${esc(r.pix)}"`,'p')}</div><label>Depois de pagar, anexe a foto do comprovante</label><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div>${bt('comp','Enviar comprovante',`data-id="${r.id}"`,'p')}`:'<div class="box">O vendedor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</div>')
   :`<div class="box"><b>Pagamento no cartão de ${m=='credito'?'crédito':'débito'}</b><p>Entre em contato com o vendedor para acertar o pagamento. Quando vocês combinarem, ele aprova o seu pedido.</p></div>`;
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}${zap?`<a href="${zap}" target="_blank" rel="noopener"><button style="width:100%">WhatsApp</button></a>`:''}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
 }
-async function chat(id,tit){
+async function chat(url,tit){
  clearInterval(ct);
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">💬 ${esc(tit)}</h3><div id="msgs" style="height:300px;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"></div><div class="row"><input id="mt" placeholder="Escreva uma mensagem" maxlength="1000" style="margin:0;flex:4">${bt('msg','Enviar',`data-id="${id}"`,'p')}</div><br>${bt('fechar','Fechar')}</div></div>`;
- loadMsgs=async()=>{const m=await api(`/api/pedidos/${id}/mensagens`),el=$('#msgs');if(!el){clearInterval(ct);return}
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">💬 ${esc(tit)}</h3><div id="msgs" style="height:300px;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"></div><div class="row"><input id="mt" placeholder="Escreva uma mensagem" maxlength="1000" style="margin:0;flex:4">${bt('msg','Enviar',`data-u="${esc(url)}"`,'p')}</div><br>${bt('fechar','Fechar')}</div></div>`;
+ loadMsgs=async()=>{const m=await api(url),el=$('#msgs');if(!el){clearInterval(ct);return}
   const fim=el.scrollTop+el.clientHeight>=el.scrollHeight-30;
   el.innerHTML=m.mensagens.map(x=>`<div style="text-align:${x.minha?'right':'left'};margin:6px 0"><span style="display:inline-block;max-width:85%;padding:6px 10px;border-radius:12px;background:${x.minha?'var(--ac)':'var(--card)'};color:${x.minha?'#fff':'var(--fg)'};text-align:left;white-space:pre-wrap;word-break:break-word">${esc(x.texto)}</span><div class="mut" style="font-size:11px">${dt(x.criado)}</div></div>`).join('')||'<p class="mut">Nenhuma mensagem ainda. Diga olá!</p>';
   if(fim)el.scrollTop=el.scrollHeight};
@@ -512,19 +513,19 @@ function vConta(){
 
 /* ---------- vendedor ---------- */
 async function vVend(){
- const T=[['loja','Loja'],['prod','Produtos'],['cup','Cupons'],['vale','Vales'],['avi','Avisos'],['ped','Pedidos'],['rel','Relatório']];
+ const T=[['loja','Loja'],['prod','Produtos'],['cup','Cupons'],['vale','Vales'],['avi','Avisos'],['ped','Pedidos'],['conv','Conversas'],['rel','Relatório']];
  app.innerHTML=`<div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('tab',n,`data-t="${k}"`,tab==k?'on':'')).join('')}</div><div id="tb"></div>`;
- await({loja:tLoja,prod:tProd,cup:tCup,vale:tVale,avi:tAvi,ped:tPed,rel:tRel})[tab]();
+ await({loja:tLoja,prod:tProd,cup:tCup,vale:tVale,avi:tAvi,ped:tPed,conv:tConv,rel:tRel})[tab]();
 }
 function tLoja(){
  const l=eu.loja,link=location.origin+'/?loja='+l.slug;
- $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Foto de perfil da loja (deixe vazio para manter a atual)</label><input id="av" type="file" accept="image/*"><label>Banner da loja (deixe vazio para manter o atual)</label><input id="bn" type="file" accept="image/*"><label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('wa','Seu WhatsApp (com DDD)',l.whatsapp,'inputmode="tel"')}${inp('px','Chave Pix',l.pix)}<div class="err" id="er"></div><div class="row">${bt('salvarloja','Salvar','','p')}${bt('go','Ver minha loja',`data-v="loja" data-a="${l.slug}"`)}</div></div>
- <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}<a href="https://wa.me/?text=${encodeURIComponent('Conheça a minha loja: '+link)}" target="_blank" rel="noopener"><button style="width:100%">Enviar no WhatsApp</button></a></div></div>`;
+ $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Foto de perfil da loja (deixe vazio para manter a atual)</label><input id="av" type="file" accept="image/*"><label>Banner da loja (deixe vazio para manter o atual)</label><input id="bn" type="file" accept="image/*"><label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('px','Chave Pix',l.pix)}<div class="err" id="er"></div><div class="row">${bt('salvarloja','Salvar','','p')}${bt('go','Ver minha loja',`data-v="loja" data-a="${l.slug}"`)}</div></div>
+ <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}${bt('compartilhar','Compartilhar',`data-l="${esc(link)}"`)}</div></div>`;
 }
 async function tProd(){
  const l=await api('/api/vendedor/produtos');
- $('#tb').innerHTML=`<div class="box"><h3 style="margin-top:0">Adicionar produto</h3><label>Classe</label><select id="cl">${Object.keys(NEED).map(k=>`<option value="${k}">${CL[k]}</option>`).join('')}</select><div id="ex"></div><label>Descrição</label><textarea id="d" rows="2"></textarea>${inp('pr','Preço (R$)','','inputmode="decimal"')}${inp('es','Quantidade em estoque','1','type="number" min="1"')}<label>Foto</label><input id="ft" type="file" accept="image/*"><div class="err" id="er"></div>${bt('addprod','Adicionar','','p')}</div><div class="grid">${l.map(p=>card(p,1)).join('')}</div>`;
- const ex=()=>{const n=NEED[$('#cl').value];$('#ex').innerHTML=(n.includes('nome')?inp('nm','Nome do produto'):'')+(n.includes('tam')?inp('tm','Tamanho'):'')};ex();$('#cl').onchange=ex;
+ $('#tb').innerHTML=`<div class="box"><h3 style="margin-top:0">Adicionar produto</h3><label>Classe</label><select id="cl">${Object.keys(NEED).map(k=>`<option value="${k}">${CL[k]}</option>`).join('')}</select><div id="ex"></div><label id="dl">Descrição</label><textarea id="d" rows="2"></textarea>${inp('pr','Preço (digite só os números)','R$ 0,00','inputmode="numeric"')}${inp('es','Quantidade em estoque (não vale para serviços)','1','type="number" min="1"')}<label>Foto (opcional para serviços)</label><input id="ft" type="file" accept="image/*"><div class="err" id="er"></div>${bt('addprod','Adicionar','','p')}</div><div class="grid">${l.map(p=>card(p,1)).join('')}</div>`;
+ const ex=()=>{const n=NEED[$('#cl').value];$('#dl').textContent=$('#cl').value=='servicos'?'Descrição do serviço':'Descrição';$('#ex').innerHTML=(n.includes('nome')?inp('nm','Nome do produto'):'')+(n.includes('tam')?inp('tm','Tamanho'):'')};ex();$('#cl').onchange=ex;
 }
 async function tCup(){
  const l=await api('/api/vendedor/cupons');
@@ -541,21 +542,29 @@ function tAvi(){
 }
 async function tPed(){
  const o=await api('/api/vendedor/pedidos?ordem='+ord);
- $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · <a href="https://wa.me/55${x.telefone.replace(/^55/,'')}" target="_blank" rel="noopener">${esc(x.telefone)}</a>${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
+ $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
  $('#od').value=ord;
+}
+async function tConv(){
+ const l=await api('/api/vendedor/conversas');
+ $('#tb').innerHTML='<p class="mut">Clientes que escreveram para a loja antes de comprar. As conversas dos pedidos ficam em Pedidos.</p>'+(l.length?l.map(x=>`<div class="box row" style="align-items:center"><div><b>${esc(x.email)}</b><div class="mut">${dt(x.ultima)}</div></div>${bt('chatconv','💬 Abrir',`data-id="${x.cliente_id}" data-t="${esc(x.email)}"`)}</div>`).join(''):'<p class="mut">Nenhuma conversa ainda.</p>');
 }
 async function tRel(){$('#tb').innerHTML=relTab(await api('/api/vendedor/relatorio'))}
 const relTab=r=>`<div class="box sc"><table><tr><th>Período</th><th>Vendas</th><th>Total</th></tr>${[['mes','Mês'],['bimestre','Bimestre'],['trimestre','Trimestre'],['ano','Ano']].map(([k,n])=>`<tr><td>${n}</td><td>${r[k].vendas}</td><td>${brl(r[k].total)}</td></tr>`).join('')}</table></div>`;
 
 /* ---------- ADM ---------- */
 async function vAdm(){
- const [u,r]=await Promise.all([api('/api/admin/usuarios'),api('/api/admin/relatorio')]);
- app.innerHTML=`<h3>Relatório de vendas (todas as lojas)</h3>${relTab(r)}<h3>Usuários</h3><div class="sc box"><table><tr><th>E-mail</th><th>Tipo</th><th>Loja</th><th></th></tr>${u.map(x=>`<tr><td>${esc(x.email)}</td><td>${x.papel}${x.bloqueado?' 🚫':''}</td><td>${esc(x.loja||'')}</td><td>${x.papel=='admin'?'':bt('bloq',x.bloqueado?'Desbloquear':'Bloquear',`data-id="${x.id}" data-b="${x.bloqueado?0:1}"`)+' '+bt('deluser','Excluir',`data-id="${x.id}"`)}</td></tr>`).join('')}</table></div>`;
+ const [u,r,bi]=await Promise.all([api('/api/admin/usuarios'),api('/api/admin/relatorio'),api('/api/banner/info')]);
+ app.innerHTML=`<h3>Vídeo do banner inicial</h3><div class="box">${bi.video?`<video src="/api/banner/video?v=${bi.versao}" muted loop autoplay playsinline style="width:100%;max-height:200px;border-radius:10px;object-fit:cover"></video><p class="mut">Vídeo atual do banner.</p>`:'<p class="mut">Sem vídeo: o banner usa o fundo padrão.</p>'}<label>Enviar novo vídeo (MP4 ou WebM, curto, até 12 MB)</label><input id="vd" type="file" accept="video/mp4,video/webm"><div class="err" id="er"></div><div class="row">${bt('upvideo','Enviar vídeo','','p')}${bi.video?bt('delvideo','Remover vídeo'):''}</div></div><h3>Relatório de vendas (todas as lojas)</h3>${relTab(r)}<h3>Usuários</h3><div class="sc box"><table><tr><th>E-mail</th><th>Tipo</th><th>Loja</th><th></th></tr>${u.map(x=>`<tr><td>${esc(x.email)}</td><td>${x.papel}${x.bloqueado?' 🚫':''}</td><td>${esc(x.loja||'')}</td><td>${x.papel=='admin'?'':bt('bloq',x.bloqueado?'Desbloquear':'Bloquear',`data-id="${x.id}" data-b="${x.bloqueado?0:1}"`)+' '+bt('deluser','Excluir',`data-id="${x.id}"`)}</td></tr>`).join('')}</table></div>`;
 }
 
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ upvideo:async()=>{const f=$('#vd').files[0];if(!f)throw new Error('Escolha um vídeo.');if(f.size>12*1024*1024)throw new Error('Vídeo grande demais (máximo 12 MB).');
+  const d=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)});
+  $('#er').textContent='Enviando...';await api('/api/admin/banner-video','POST',{video:d});vAdm()},
+ delvideo:async()=>{if(confirm('Remover o vídeo do banner?')){await api('/api/admin/banner-video','DELETE');vAdm()}},
  pickuf:()=>pk('Escolha o estado',`<div style="max-height:60vh;overflow:auto">${[...UF].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')).map(([s,n])=>`<button style="width:100%;text-align:left;margin-bottom:6px" data-x="setuf" data-u="${s}" data-n="${n}">${n} (${s})</button>`).join('')}</div>`),
  setuf:d=>{cur.uf={sigla:d.u,nome:d.n};$('#f_uf').value=`${d.n} (${d.u})`;$('#f_ci').value='';A.fechar2()},
  pickcid:async()=>{
@@ -579,8 +588,11 @@ const A={
  buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};draw()},
  buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id})},
  vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)})},
- chat:d=>chat(d.id,d.t),
- msg:async d=>{const t=val('mt');if(!t)return;await api(`/api/pedidos/${d.id}/mensagens`,'POST',{texto:t});$('#mt').value='';await loadMsgs()},
+ chat:d=>chat(`/api/pedidos/${d.id}/mensagens`,d.t),
+ chatloja:d=>{if(!eu.logado){alert('Crie uma conta ou entre para conversar com a loja.');return A.area({ar:'cliente'})}chat(`/api/lojas/${d.id}/mensagens`,d.t)},
+ chatconv:d=>chat(`/api/vendedor/conversas/${d.id}/mensagens`,d.t),
+ compartilhar:async d=>{if(navigator.share){try{await navigator.share({title:'Minha loja',text:'Conheça a minha loja:',url:d.l})}catch(e){}}else A.copiar(d)},
+ msg:async d=>{const t=val('mt');if(!t)return;await api(d.u,'POST',{texto:t});$('#mt').value='';await loadMsgs()},
  copiarpix:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Chave Pix copiada!')}catch(e){prompt('Copie a chave Pix:',d.l)}},
  comp:async d=>{const f=$('#cp')?.files[0];if(!f)throw new Error('Escolha a foto do comprovante.');await api(`/api/pedidos/${d.id}/comprovante`,'PUT',{comprovante:await img(f,900)});alert('Comprovante enviado! O vendedor vai conferir e aprovar o seu pedido.');if(view=='meus'){A.fechar();vMeus()}else $('#cp').value=''},
  compmodal:d=>{$('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Comprovante do Pix</h3><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('comp','Enviar',`data-id="${d.id}"`,'p')}</div></div></div>`},
@@ -601,22 +613,10 @@ const A={
  sair:async()=>{await api('/api/logout','POST');eu={logado:false};go('inicio')},
  tab:d=>{tab=d.t;vVend()},
  ltab:d=>{lt=d.t;vLoja()},
- salvarloja:async()=>{const a=$('#av').files[0],b=$('#bn').files[0];await api('/api/vendedor/loja','PUT',{nome:val('ln'),quem_somos:$('#qs').value,whatsapp:val('wa'),pix:val('px'),avatar:a?await img(a,400):undefined,banner:b?await img(b,1200):undefined});eu=await api('/api/eu');$('#er').textContent='Salvo ✔'},
+ salvarloja:async()=>{const a=$('#av').files[0],b=$('#bn').files[0];await api('/api/vendedor/loja','PUT',{nome:val('ln'),quem_somos:$('#qs').value,pix:val('px'),avatar:a?await img(a,400):undefined,banner:b?await img(b,1200):undefined});eu=await api('/api/eu');$('#er').textContent='Salvo ✔'},
  copiar:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Link copiado!')}catch(e){prompt('Copie o link:',d.l)}},
- addprod:async()=>{const f=$('#ft').files[0];if(!f)throw new Error('Adicione a foto.');await api('/api/vendedor/produtos','POST',{classe:val('cl'),nome:val('nm'),tamanho:val('tm'),descricao:val('d'),preco:parseFloat(val('pr').replace(',','.')),estoque:val('es'),foto:await img(f)});tProd()},
+ addprod:async()=>{const f=$('#ft').files[0];if(!f&&val('cl')!='servicos')throw new Error('Adicione a foto.');await api('/api/vendedor/produtos','POST',{classe:val('cl'),nome:val('nm'),tamanho:val('tm'),descricao:val('d'),preco:parseInt(digits(val('pr'))||'0',10)/100,estoque:val('es'),foto:f?await img(f):undefined});tProd()},
  estoque:async d=>{await api(`/api/vendedor/produtos/${d.id}/estoque`,'PUT',{estoque:$('#e'+d.id).value});tProd()},
  delprod:async d=>{if(confirm('Excluir produto?')){await api('/api/vendedor/produtos/'+d.id,'DELETE');tProd()}},
  addcup:async()=>{await api('/api/vendedor/cupons','POST',{codigo:val('cc'),tipo:val('ct'),valor:val('cv').replace(',','.')});tCup()},
  delcup:async d=>{await api('/api/vendedor/cupons/'+d.id,'DELETE');tCup()},
- addvale:async()=>{const r=await api('/api/vendedor/vales','POST',{valor:val('vv')});alert('Vale emitido! Código: '+r.codigo);tVale()},
- addavi:async()=>{await api('/api/vendedor/avisos','POST',{tipo:val('at'),titulo:val('ati'),texto:$('#atx').value});$('#er').textContent='Publicado ✔'},
- bloq:async d=>{await api(`/api/admin/usuarios/${d.id}/bloqueio`,'POST',{bloqueado:d.b=='1'});vAdm()},
- deluser:async d=>{if(confirm('Excluir este usuário e os dados dele?')){await api('/api/admin/usuarios/'+d.id,'DELETE');vAdm()}},
-};
-document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
- try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
-document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
-document.addEventListener('input',e=>{if(e.target.id=='pq'&&cidLista)cidLista(e.target.value)});
-document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
-init();
-</script></body></html>
