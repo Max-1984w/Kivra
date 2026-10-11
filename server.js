@@ -128,7 +128,7 @@ app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ ok: t
 app.get('/api/eu', async (req, res) => {
   if (!req.u) return res.json({ logado: false });
   const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id) : null;
-  res.json({ logado: true, email: req.u.email, papel: req.u.papel, loja });
+  res.json({ logado: true, email: req.u.email, papel: req.u.papel, loja, mp_pronto: mpPronto() });
 });
 
 // ---------- VITRINE PÚBLICA ----------
@@ -559,6 +559,24 @@ app.post('/api/vendedor/assinatura/cancelar', vendedor, async (req, res) => {
   if (!r.ok) return res.status(502).json({ erro: 'Não foi possível cancelar agora. Tente de novo.' });
   await run('UPDATE lojas SET assin_status=?, assin_check=? WHERE id=?', 'cancelled', Date.now(), l.id);
   res.json({ ok: true });
+});
+
+// ---------- STATUS DO MERCADO PAGO (só o ADM) ----------
+app.get('/api/admin/mp/status', admin, async (req, res) => {
+  const cfg = { site_url: !!SITE_URL, client_id: !!MP_ID, client_secret: !!MP_SECRET, access_token: !!process.env.MP_ACCESS_TOKEN };
+  let conta = null, erro = null;
+  if (req.query.testar) {
+    if (!cfg.access_token) erro = 'Falta a variável MP_ACCESS_TOKEN no Render.';
+    else {
+      try {
+        const r = await mpDono('/users/me'), j = await r.json();
+        if (r.ok) conta = { id: j.id, apelido: j.nickname, email: j.email };
+        else erro = `O Mercado Pago recusou o Access Token (código ${r.status}). Confira se é o de produção e se foi colado sem espaços.`;
+      } catch (e) { erro = 'Não foi possível falar com o Mercado Pago agora.'; }
+    }
+  }
+  const c = await get(`SELECT COUNT(*) FILTER (WHERE mp_access_token IS NOT NULL) AS lojas, COUNT(*) FILTER (WHERE assin_status='authorized') AS assinantes FROM lojas`);
+  res.json({ cfg, conta, erro, redirect_url: SITE_URL ? SITE_URL + '/api/mp/callback' : null, taxa_pct: TAXA_SEM_ASSINATURA, lojas: c.lojas, assinantes: c.assinantes });
 });
 
 // ---------- SITE ----------
