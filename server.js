@@ -406,7 +406,7 @@ app.delete('/api/admin/banner-video', admin, async (req, res) => { await run('DE
 const SITE_URL = (process.env.SITE_URL || '').replace(/\/$/, '');
 const MP_ID = process.env.MP_CLIENT_ID, MP_SECRET = process.env.MP_CLIENT_SECRET;
 const TAXA_SEM_ASSINATURA = Math.min(Math.max(Number(process.env.TAXA_SEM_ASSINATURA ?? 10), 0), 50);   // % cobrada de quem não assina
-const ASSIN_VALOR = 49.9;                                                                                     // assinatura mensal (R$)
+const ASSIN_VALOR = Number(process.env.ASSIN_VALOR) > 0 ? Number(process.env.ASSIN_VALOR) : 24.9;                                                                                     // assinatura mensal (R$)
 const mpPronto = () => !!(MP_ID && MP_SECRET && SITE_URL);
 const CHAVE = crypto.createHash('sha256').update(process.env.SEGREDO || 'troque-este-segredo').digest();
 const cifrar = t => { const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', CHAVE, iv);
