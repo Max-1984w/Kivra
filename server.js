@@ -58,7 +58,9 @@ async function criarTabelas() {
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS aprovado_em BIGINT;
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_id TEXT;
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_status TEXT;
-  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_check BIGINT;`);
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_check BIGINT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS acesso_ate BIGINT;
+  CREATE TABLE IF NOT EXISTS chaves_acesso(id SERIAL PRIMARY KEY, codigo TEXT UNIQUE, dias INTEGER, criada BIGINT, usada_por INTEGER, usada_em BIGINT);`);
 }
 
 // ---------- REGRAS ----------
@@ -534,17 +536,21 @@ async function atualizarAssinatura(l, forcar = false) {   // confere a situaçã
   } catch (e) { console.error('Assinatura MP:', e.message); }
   return l.assin_status;
 }
-const assinaturaAtiva = async lojaId =>
-  (await atualizarAssinatura(await get('SELECT id,assin_id,assin_status,assin_check FROM lojas WHERE id=?', lojaId))) === 'authorized';
+const assinaturaAtiva = async lojaId => {      // vale a assinatura do Mercado Pago OU uma chave de acesso ainda dentro do prazo
+  const l = await get('SELECT id,assin_id,assin_status,assin_check,acesso_ate FROM lojas WHERE id=?', lojaId);
+  if (!l) return false;
+  if (Number(l.acesso_ate) > Date.now()) return true;
+  return (await atualizarAssinatura(l)) === 'authorized';
+};
 app.get('/api/vendedor/assinatura', vendedor, async (req, res) => {
-  const l = await get('SELECT id,assin_id,assin_status,assin_check,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', req.loja.id);
+  const l = await get('SELECT id,assin_id,assin_status,assin_check,acesso_ate,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', req.loja.id);
   const status = await atualizarAssinatura(l, true);
   const lim = Date.now() - 7 * 24 * 3600 * 1000;
   const resumo = await get(`SELECT COUNT(*) AS n, COALESCE(SUM(preco),0) AS bruto, COALESCE(SUM(COALESCE(taxa_mp,0)),0) AS taxa,
       COALESCE(SUM(CASE WHEN COALESCE(aprovado_em,criado) > ? THEN preco-COALESCE(taxa_mp,0) ELSE 0 END),0) AS recente,
       COALESCE(SUM(CASE WHEN COALESCE(aprovado_em,criado) <= ? THEN preco-COALESCE(taxa_mp,0) ELSE 0 END),0) AS antigo
     FROM pedidos WHERE loja_id=? AND status='aprovado' AND mp_pagamento IS NOT NULL`, lim, lim, req.loja.id);
-  res.json({ status: status || null, ativa: status === 'authorized', valor: ASSIN_VALOR, taxa_pct: TAXA_SEM_ASSINATURA, disponivel: assinPronta(), mp: !!l.mp, resumo });
+  res.json({ status: status || null, ativa: status === 'authorized', chave_ate: Number(l.acesso_ate) || 0, valor: ASSIN_VALOR, taxa_pct: TAXA_SEM_ASSINATURA, disponivel: assinPronta(), mp: !!l.mp, resumo });
 });
 app.post('/api/vendedor/assinatura', vendedor, async (req, res) => {
   if (!assinPronta()) return res.status(400).json({ erro: 'A assinatura ainda não foi configurada pelo administrador do site.' });
@@ -588,6 +594,37 @@ app.get('/api/admin/mp/status', admin, async (req, res) => {
   }
   const c = await get(`SELECT COUNT(*) FILTER (WHERE mp_access_token IS NOT NULL) AS lojas, COUNT(*) FILTER (WHERE assin_status='authorized') AS assinantes FROM lojas`);
   res.json({ cfg, conta, erro, redirect_url: SITE_URL ? SITE_URL + '/api/mp/callback' : null, taxa_pct: TAXA_SEM_ASSINATURA, lojas: c.lojas, assinantes: c.assinantes });
+});
+
+// ---------- CHAVES DE ACESSO (o ADM gera, o lojista ativa) ----------
+const ALFA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sem letras que se confundem (0/O, 1/I)
+const novaChave = () => 'KIV-' + [0, 1, 2].map(() => Array.from(crypto.randomBytes(4), b => ALFA[b % 32]).join('')).join('-');
+app.post('/api/admin/chaves', admin, async (req, res) => {
+  const dias = parseInt(req.body.dias);
+  if (!(dias >= 7 && dias <= 30)) return res.status(400).json({ erro: 'Escolha de 7 a 30 dias.' });
+  const codigo = novaChave();
+  await run('INSERT INTO chaves_acesso(codigo,dias,criada) VALUES(?,?,?)', codigo, dias, Date.now());
+  res.json({ ok: true, codigo, dias });
+});
+app.get('/api/admin/chaves', admin, async (req, res) => res.json(await all(
+  `SELECT k.id,k.codigo,k.dias,k.criada,k.usada_em,l.nome AS loja FROM chaves_acesso k LEFT JOIN lojas l ON l.id=k.usada_por ORDER BY k.id DESC LIMIT 50`)));
+app.delete('/api/admin/chaves/:id', admin, async (req, res) => {
+  await run('DELETE FROM chaves_acesso WHERE id=? AND usada_em IS NULL', req.params.id);   // chave já usada não se apaga
+  res.json({ ok: true });
+});
+const tentativasChave = new Map();                  // limite simples contra quem tenta adivinhar chaves
+app.post('/api/vendedor/chave', vendedor, async (req, res) => {
+  const t = tentativasChave.get(req.u.id) || { n: 0, ate: Date.now() + 3600000 };
+  if (Date.now() > t.ate) { t.n = 0; t.ate = Date.now() + 3600000; }
+  if (t.n >= 10) return res.status(429).json({ erro: 'Muitas tentativas. Tente de novo mais tarde.' });
+  const limpo = txt(req.body.codigo).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // "usar" a chave é uma só operação no banco: se duas pessoas tentarem ao mesmo tempo, só uma consegue
+  const k = limpo ? await get(`UPDATE chaves_acesso SET usada_por=?, usada_em=? WHERE REPLACE(codigo,'-','')=? AND usada_em IS NULL RETURNING dias`, req.loja.id, Date.now(), limpo) : null;
+  if (!k) { t.n++; tentativasChave.set(req.u.id, t); return res.status(400).json({ erro: 'Chave inválida ou já usada.' }); }
+  const l = await get('SELECT acesso_ate FROM lojas WHERE id=?', req.loja.id);
+  const ate = Math.max(Date.now(), Number(l.acesso_ate) || 0) + k.dias * 24 * 3600 * 1000;   // soma ao que já tinha
+  await run('UPDATE lojas SET acesso_ate=? WHERE id=?', ate, req.loja.id);
+  res.json({ ok: true, dias: k.dias, ate });
 });
 
 // ---------- SITE ----------
