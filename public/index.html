@@ -2,16 +2,17 @@
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kivra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Playfair+Display:wght@700;900&display=swap">
 <style>
-:root{color-scheme:dark;--bg:#0b0d09;--fg:#eef2e8;--mut:#9aa68f;--card:#14180f;--bd:#262d1f;--ac:#5f7a3d;--ac2:#b9cf9c}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+:root{color-scheme:light;--bg:#fbf6ef;--fg:#2a1f19;--mut:#7a685b;--card:#ffffff;--bd:#eadfd1;--ac:#b4532a;--ac2:#9a4220}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 'Montserrat',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
 a{color:var(--ac)}
-.aviso{background:var(--ac);color:#fff;text-align:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;font-weight:600;font-size:14px}
+.aviso{background:#f1e4d3;color:#2a1f19;text-align:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;font-weight:600;font-size:14px}
 nav{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--bd);flex-wrap:wrap}
 button,select,input,textarea{font:inherit;color:var(--fg)}
 button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;cursor:pointer}
 button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.on{border-color:var(--ac);color:var(--ac)}
-main{max-width:980px;margin:0 auto;padding:16px}
+main{max-width:1200px;margin:0 auto;padding:16px}main.home{padding-top:0}html,body{overflow-x:hidden}
 input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:9px;margin:4px 0 10px}
 label{font-size:13px;color:var(--mut)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
@@ -28,28 +29,40 @@ label{font-size:13px;color:var(--mut)}
 .vale{font-size:20px;font-weight:700;padding:16px 8px}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
 .sc{overflow-x:auto}
+.util{background:#1f1a17;color:#f3e7da;display:flex;justify-content:flex-end;flex-wrap:wrap}
+.util button{background:none;border:0;border-left:1px solid #3a302a;border-radius:0;color:#f3e7da;padding:14px 18px;font-size:14px}
+.util button:hover{background:#2c231e}
+.top{display:flex;align-items:center;gap:24px;padding:18px 32px;background:#fff;border-bottom:1px solid var(--bd);flex-wrap:wrap}
+.logo{font:900 28px/1 'Playfair Display',Georgia,serif;letter-spacing:.2em;color:var(--fg);cursor:pointer}
+.menu{display:flex;gap:22px;flex:1;justify-content:center;overflow-x:auto;white-space:nowrap;flex-wrap:nowrap;padding:0;border:0}
+.menu a{font-weight:700;font-size:13px;color:var(--fg);letter-spacing:.03em;cursor:pointer}
+.menu a:hover{color:var(--ac)}
+.busca{display:flex;align-items:center;border-bottom:1px solid var(--fg);min-width:220px}
+.busca input{border:0;margin:0;background:transparent;padding:8px}
+.busca button{border:0;background:none;padding:4px 6px}
+@media(max-width:700px){.top{padding:14px 16px;gap:12px}.menu{order:3;width:100%;justify-content:flex-start}.busca{flex:1;min-width:0}.util button{padding:12px 12px;font-size:13px}}
 .bv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
-.ph{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1c2511,#3f5229);font-weight:700;color:#dbe8c8}
-.ban{height:clamp(120px,28vw,240px);border-radius:14px;background:linear-gradient(120deg,#1c2511,#5f7a3d) center/cover;border:1px solid var(--bd)}
+.ph{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2e1c12,#7a3b1f);font-weight:700;color:#f3dcc4}
+.ban{height:clamp(120px,28vw,240px);border-radius:14px;background:linear-gradient(120deg,#2e1c12,#b4532a) center/cover;border:1px solid var(--bd)}
 .perfil{display:flex;gap:14px;align-items:flex-end;margin:-44px 16px 14px;position:relative}
 .av{width:96px;height:96px;flex:0 0 96px;border-radius:50%;border:4px solid var(--bg);object-fit:cover;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:800}
 a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
-.hero{position:relative;border-radius:14px;overflow:hidden;min-height:400px;color:#fff;background:radial-gradient(ellipse at 50% 35%,#3f5229,#0c0c0e 72%);border:1px solid var(--bd)}
+.hero{position:relative;overflow:hidden;min-height:clamp(380px,46vw,620px);color:#fff;margin:0 calc(50% - 50vw) 24px;width:100vw;background:radial-gradient(ellipse at 50% 35%,#8a4524,#1f1410 75%)}
 .sl{position:absolute;inset:0;z-index:1;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 64px 56px;gap:12px}
 .sl.on{display:flex}
-.k{letter-spacing:.3em;font-size:13px;color:#dbe8c8}
-.h{font-size:clamp(34px,8vw,64px);font-weight:800;line-height:1.05}
-.cp{border:1px solid #dbe8c866;border-radius:12px;padding:10px 22px;max-width:440px}
-.hb{background:#fff;color:#111;border:0;font-weight:700;letter-spacing:.08em;padding:12px 28px}
-.ar{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:#ffffff33;border:0;color:#fff;font-size:20px;padding:0;z-index:2}
+.k{letter-spacing:.3em;font-size:13px;color:#f3dcc4}
+.h{font:900 clamp(44px,9vw,110px)/1 'Playfair Display',Georgia,serif;letter-spacing:.04em;text-transform:uppercase}
+.cp{border:1px solid #f3dcc466;border-radius:12px;padding:10px 22px;max-width:440px}
+.hb{background:none;border:0;border-bottom:2px solid #fff;color:#fff;border-radius:0;font-weight:600;letter-spacing:.3em;padding:6px 2px;margin-top:10px}
+.ar{position:absolute;top:50%;transform:translateY(-50%);width:54px;height:54px;border-radius:0;background:#ffffffcc;border:0;color:#222;font-size:24px;padding:0;z-index:2}
 .ctl{position:absolute;left:16px;bottom:14px;display:flex;gap:8px;align-items:center;z-index:2}
 .dt{width:8px;height:8px;border-radius:50%;background:#fff6;padding:0;border:0}.dt.on{width:28px;border-radius:6px;background:#fff}
 .ps{width:28px;height:28px;border-radius:50%;background:#ffffff33;border:0;color:#fff;padding:0;font-size:12px}
-.app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#1c2511,#5f7a3d);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
+.app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#2e1c12,#b4532a);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
 <div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do app, compras feitas para fora do pais não seram reembolsadas</div>
-<nav id="nav"></nav><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
+<div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
 const NEED={roupas:['tam'],calcados:['tam'],bolsas:[],perfumes:['nome'],cosmeticos:['nome'],servicos:[]};
@@ -76,12 +89,11 @@ let cidLista=null,mpTeste=false;
 let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null,ar='cliente',ct=null,loadMsgs=null;
 function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
 function nav(){
- const b=(v,t)=>`<button data-x="go" data-v="${v}" class="${view==v?'on':''}">${t}</button>`;
- $('#nav').innerHTML=b('inicio','🏠 Início')+b('prod','🔎 Produtos')+(eu.logado?b('meus','Meus pedidos'):'')+
-  (eu.papel=='vendedor'?b('vend','🏪 Minha loja'):'')+(eu.papel=='admin'?b('adm','🛡️ ADM'):'')+
-  (eu.logado?bt('sair','Sair'):bt('area','Entrar / Criar conta','data-ar="cliente"')+bt('area','🏪 Área do vendedor','data-ar="vendedor"','p'));
+ const u=(x,t,d='')=>`<button data-x="${x}" ${d}>${t}</button>`;
+ $('#util').innerHTML=(eu.logado?u('go','📦 Meus pedidos','data-v="meus"'):'')+(eu.papel=='vendedor'?u('go','🏪 Minha loja','data-v="vend"'):'')+(eu.papel=='admin'?u('go','🛡️ ADM','data-v="adm"'):'')+(eu.logado?u('sair','👤 Sair'):u('area','👤 Entre ou Cadastre-se','data-ar="cliente"')+u('area','🏪 Área do vendedor','data-ar="vendedor"'));
+ $('#menu').innerHTML=Object.entries(CL).map(([k,n])=>`<a data-x="cat" data-c="${k}">${n.toUpperCase()}</a>`).join('');
 }
-async function draw(){nav();try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+async function draw(){nav();app.classList.toggle('home',view=='inicio');try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
 async function init(){try{eu=await api('/api/eu')}catch(e){}
  const q=new URLSearchParams(location.search),l=q.get('loja'),mp=q.get('mp'),pg=q.get('pagamento'),ass=q.get('assinatura');
  history.replaceState(null,'',location.pathname+(l?'?loja='+encodeURIComponent(l):''));
@@ -96,21 +108,21 @@ let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
 function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
 async function vInicio(){
- const [av,lj,bi]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info')]);
+ const [av,lj,bi,nv]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos')]);
  const S=[{k:'ROUPAS • CALÇADOS • BOLSAS • PERFUMES',s:'COSMÉTICOS • VALE PRESENTE',h:'Kivra',c:'Compre direto das melhores lojas',b:'COMPRAR',v:'prod'},
   ...av.filter(a=>a.tipo=='promocao').slice(0,5).map(a=>({k:a.loja_nome.toUpperCase(),s:'PROMOÇÃO',h:a.titulo,c:a.texto,b:'VER LOJA',v:'loja',a:a.slug}))];
  const es=av.filter(a=>a.tipo=='estoque');
  sl=0;
  app.innerHTML=`<div class="hero">${bi.video?`<video class="bv" src="/api/banner/video?v=${bi.versao}" autoplay muted loop playsinline></video>`:''}${S.map((x,i)=>`<div class="sl ${i?'':'on'}"><div class="k">${esc(x.k)}</div><div class="k">${esc(x.s)}</div><div class="h">${esc(x.h)}</div>${x.c?`<div class="cp">${esc(x.c)}</div>`:''}<button class="hb" data-x="go" data-v="${x.v}" ${x.a?`data-a="${x.a}"`:''}>${x.b}</button></div>`).join('')}
- ${S.length>1?`<button class="ar" style="left:12px" data-x="pass" data-n="-1">‹</button><button class="ar" style="right:12px" data-x="pass" data-n="1">›</button>`:''}
+ ${S.length>1?`<button class="ar" style="left:0" data-x="pass" data-n="-1">‹</button><button class="ar" style="right:0" data-x="pass" data-n="1">›</button>`:''}
  <div class="ctl">${S.map((x,i)=>`<button class="dt ${i?'':'on'}" data-x="dot" data-i="${i}"></button>`).join('')}<button class="ps" data-x="pausa">⏸</button></div></div>
- <div class="app"><div><b>Instale o app Kivra</b><div style="opacity:.85">Tenha tudo em um só lugar, no computador ou no celular.</div></div><button data-x="instalar">Instalar</button></div>
+ ${nv.length?`<h3>Novidades</h3><div class="grid">${nv.slice(0,8).map(p=>card(p)).join('')}</div>`:''}<div class="app"><div><b>Instale o app Kivra</b><div style="opacity:.85">Tenha tudo em um só lugar, no computador ou no celular.</div></div><button data-x="instalar">Instalar</button></div>
  ${lj.length?`<h3>Lojas</h3><div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}
  ${es.length?`<h3>Atualizações de estoque</h3>`+es.map(a=>`<div class="box"><span class="tag">📦 Estoque</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):''}`;
  clearInterval(tm);tm=setInterval(()=>{if(!pausa&&view=='inicio')slide(sl+1)},5000);
 }
 async function vInicioOld(){
- const [av,lj,bi]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info')]);
+ const [av,lj,bi,nv]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos')]);
  app.innerHTML=`<h1 style="margin:6px 0">Kivra</h1><p class="mut">Promoções, atualizações de estoque e lojas parceiras.</p>${lj.length?`<div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}`+
  (av.length?av.map(a=>`<div class="box"><span class="tag">${a.tipo=='estoque'?'📦 Estoque':'🏷️ Promoção'}</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):'<p class="mut">Ainda não há novidades.</p>');
 }
@@ -577,6 +589,8 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ cat:d=>{Q={q:'',classe:d.c,min:'',max:''};go('prod')},
+ busca:()=>{Q={q:val('gq')||'',classe:'',min:'',max:''};go('prod')},
  mptestar:()=>{mpTeste=true;vAdm()},
  assinar:async()=>{const r=await api('/api/vendedor/assinatura','POST',{email_mp:val('am')});location.href=r.url},
  assdesc:async()=>{if(confirm('Cancelar a assinatura? A taxa de '+10+'% volta a valer nas próximas vendas.')){await api('/api/vendedor/assinatura/cancelar','POST');tAss()}},
@@ -649,7 +663,7 @@ const A={
 };
 document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
  try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
-document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
+document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='gq')A.busca();if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
 document.addEventListener('input',e=>{if(e.target.id=='pr'){const c=parseInt(digits(e.target.value)||'0',10);e.target.value='R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}if(e.target.id=='pq'&&cidLista)cidLista(e.target.value)});
 document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
 init();
