@@ -143,6 +143,17 @@ app.get('/api/produtos', async (req, res) => {
   if (loja) { sql += ' AND l.slug=?'; a.push(loja); }
   res.json(await all(sql + ' ORDER BY p.criado DESC', ...a));
 });
+// Loja que mais vendeu na semana (pedidos aprovados nos últimos 7 dias); sem vendas na semana, a que mais vendeu no total
+app.get('/api/lojas/destaque', async (req, res) => {
+  const base = filtro => `SELECT l.nome,l.slug,l.avatar,COUNT(p.id) AS vendas,COALESCE(SUM(p.preco),0) AS total
+    FROM pedidos p JOIN lojas l ON l.id=p.loja_id JOIN usuarios u ON u.id=l.usuario_id
+    WHERE p.status='aprovado' AND u.bloqueado=0 ${filtro}
+    GROUP BY l.id,l.nome,l.slug,l.avatar ORDER BY vendas DESC,total DESC LIMIT 1`;
+  let r = await get(base('AND COALESCE(p.aprovado_em,p.criado) > ?'), Date.now() - 7 * 24 * 3600 * 1000);
+  if (r) return res.json({ ...r, semana: true });
+  r = await get(base(''));
+  res.json(r ? { ...r, semana: false } : {});
+});
 app.get('/api/lojas/:slug', async (req, res) => {
   const l = await get(`SELECT l.id,l.nome,l.slug,l.quem_somos,l.whatsapp,l.avatar,l.banner FROM lojas l JOIN usuarios u ON u.id=l.usuario_id
                        WHERE l.slug=? AND u.bloqueado=0`, req.params.slug);

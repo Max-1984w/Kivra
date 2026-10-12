@@ -29,6 +29,9 @@ label{font-size:13px;color:var(--mut)}
 .vale{font-size:20px;font-weight:700;padding:16px 8px}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
 .sc{overflow-x:auto}
+.destaque{display:flex;justify-content:center;margin:8px 0 18px}
+.dst{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;color:var(--fg)}
+.avd{width:120px;height:120px;border-radius:50%;object-fit:cover;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:800;border:4px solid #fff;box-shadow:0 4px 14px #0003}
 .util{background:#1f1a17;color:#f3e7da;display:flex;justify-content:flex-end;flex-wrap:wrap}
 .util button{background:none;border:0;border-left:1px solid #3a302a;border-radius:0;color:#f3e7da;padding:14px 18px;font-size:14px}
 .util button:hover{background:#2c231e}
@@ -61,7 +64,7 @@ a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
 .app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#2e1c12,#b4532a);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do app</div>
+<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do app, compras feitas para fora do pais não seram reembolsadas</div>
 <div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
@@ -108,7 +111,7 @@ let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
 function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
 async function vInicio(){
- const [av,lj,bi,nv]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos')]);
+ const [av,lj,bi,nv,dl]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos'),api('/api/lojas/destaque')]);
  const S=[{k:'ROUPAS • CALÇADOS • BOLSAS • PERFUMES',s:'COSMÉTICOS • VALE PRESENTE',h:'Kivra',c:'Compre direto das melhores lojas',b:'COMPRAR',v:'prod'},
   ...av.filter(a=>a.tipo=='promocao').slice(0,5).map(a=>({k:a.loja_nome.toUpperCase(),s:'PROMOÇÃO',h:a.titulo,c:a.texto,b:'VER LOJA',v:'loja',a:a.slug}))];
  const es=av.filter(a=>a.tipo=='estoque');
@@ -117,12 +120,12 @@ async function vInicio(){
  ${S.length>1?`<button class="ar" style="left:0" data-x="pass" data-n="-1">‹</button><button class="ar" style="right:0" data-x="pass" data-n="1">›</button>`:''}
  <div class="ctl">${S.map((x,i)=>`<button class="dt ${i?'':'on'}" data-x="dot" data-i="${i}"></button>`).join('')}<button class="ps" data-x="pausa">⏸</button></div></div>
  ${nv.length?`<h3>Novidades</h3><div class="grid">${nv.slice(0,8).map(p=>card(p)).join('')}</div>`:''}<div class="app"><div><b>Instale o app Kivra</b><div style="opacity:.85">Tenha tudo em um só lugar, no computador ou no celular.</div></div><button data-x="instalar">Instalar</button></div>
- ${lj.length?`<h3>Lojas</h3><div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}
+ ${dl&&dl.slug?`<h3>${dl.semana?'🏆 Loja que mais vendeu na semana':'⭐ Loja destaque'}</h3><div class="destaque"><a class="dst" data-x="go" data-v="loja" data-a="${esc(dl.slug)}">${dl.avatar?`<img class="avd" src="${dl.avatar}" alt="">`:`<div class="avd">${esc(dl.nome.charAt(0).toUpperCase())}</div>`}<b>${esc(dl.nome)}</b><span class="mut">${dl.vendas} ${dl.vendas==1?'venda':'vendas'}${dl.semana?' nos últimos 7 dias':''}</span></a></div>`:''}${lj.length?`<div style="text-align:center;margin-bottom:14px">${bt('todaslojas','Ver todas as lojas')}<div id="tl" class="row" style="margin-top:10px;display:none;justify-content:center">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div></div>`:''}
  ${es.length?`<h3>Atualizações de estoque</h3>`+es.map(a=>`<div class="box"><span class="tag">📦 Estoque</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):''}`;
  clearInterval(tm);tm=setInterval(()=>{if(!pausa&&view=='inicio')slide(sl+1)},5000);
 }
 async function vInicioOld(){
- const [av,lj,bi,nv]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos')]);
+ const [av,lj,bi,nv,dl]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos'),api('/api/lojas/destaque')]);
  app.innerHTML=`<h1 style="margin:6px 0">Kivra</h1><p class="mut">Promoções, atualizações de estoque e lojas parceiras.</p>${lj.length?`<div class="row" style="margin-bottom:14px">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`:''}`+
  (av.length?av.map(a=>`<div class="box"><span class="tag">${a.tipo=='estoque'?'📦 Estoque':'🏷️ Promoção'}</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):'<p class="mut">Ainda não há novidades.</p>');
 }
@@ -589,6 +592,7 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ todaslojas:()=>{const t=$('#tl');t.style.display=t.style.display=='none'?'flex':'none'},
  cat:d=>{Q={q:'',classe:d.c,min:'',max:''};go('prod')},
  busca:()=>{Q={q:val('gq')||'',classe:'',min:'',max:''};go('prod')},
  mptestar:()=>{mpTeste=true;vAdm()},
