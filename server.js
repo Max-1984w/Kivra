@@ -734,7 +734,7 @@ app.delete('/api/enderecos/:id', logado, async (req, res) => {
 
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
-app.use(express.static(PUBLIC));
+app.use(express.static(PUBLIC, { setHeaders: (res, p) => { if (/(sw\.js|index\.html|manifest\.json)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
 app.get('/', (req, res) => {
   const f = path.join(PUBLIC, 'index.html');
   fs.existsSync(f) ? res.sendFile(f) : res.status(404).send('<h3>index.html não encontrado na pasta public</h3>');

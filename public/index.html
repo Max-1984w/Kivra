@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#b4532a">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Kivra"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><link rel="icon" type="image/png" href="/icons/favicon.png">
 <title>Kivra</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Playfair+Display:wght@700;900&display=swap">
 <style>
@@ -64,7 +67,7 @@ a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
 .app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#2e1c12,#b4532a);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="aviso">vendemos para todo o Brasil, serviços serão prestados apenas na localidade indicada pelo prestador de serviços, a combinar pelo chat </div>
+<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do app, compras feitas para fora do pais não seram reembolsadas</div>
 <div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
@@ -96,7 +99,7 @@ let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:''
 function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
 function nav(){
  const u=(x,t,d='')=>`<button data-x="${x}" ${d}>${t}</button>`;
- $('#util').innerHTML=(eu.logado?u('go','📦 Meus pedidos','data-v="meus"')+u('go','📍 Meus endereços','data-v="end"'):'')+(eu.papel=='vendedor'?u('go','🏪 Minha loja','data-v="vend"'):'')+(eu.papel=='admin'?u('go','🛡️ ADM','data-v="adm"'):'')+(eu.logado?u('sair','👤 Sair'):u('area','👤 Entre ou Cadastre-se','data-ar="cliente"')+u('area','🏪 Área do vendedor','data-ar="vendedor"'));
+ $('#util').innerHTML=(matchMedia('(display-mode: standalone)').matches?'':u('instalar','📲 Baixar app'))+(eu.logado?u('go','📦 Meus pedidos','data-v="meus"')+u('go','📍 Meus endereços','data-v="end"'):'')+(eu.papel=='vendedor'?u('go','🏪 Minha loja','data-v="vend"'):'')+(eu.papel=='admin'?u('go','🛡️ ADM','data-v="adm"'):'')+(eu.logado?u('sair','👤 Sair'):u('area','👤 Entre ou Cadastre-se','data-ar="cliente"')+u('area','🏪 Área do vendedor','data-ar="vendedor"'));
  $('#menu').innerHTML='<a data-x="go" data-v="prod">PRODUTOS</a>';
 }
 async function draw(){nav();app.classList.toggle('home',view=='inicio');try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv,end:vEnd})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
@@ -112,6 +115,8 @@ async function init(){try{eu=await api('/api/eu')}catch(e){}
 function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${p.classe=='servicos'?bt('chatloja','💬 Combinar com a loja',`data-id="${p.loja_id}" data-t="${esc(p.loja_nome||'Loja')}" data-m="${esc('Olá! Tenho interesse no serviço: '+String(p.descricao).slice(0,80))}"`,'p'):bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
 let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
+addEventListener('appinstalled',()=>{dp=null;nav()});
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
 async function vInicio(){
  const [av,lj,bi,nv,dl]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos'),api('/api/lojas/destaque')]);
@@ -126,6 +131,7 @@ async function vInicio(){
  ${dl&&dl.slug?`<h3>${dl.semana?'🏆 Loja que mais vendeu na semana':'⭐ Loja destaque'}</h3><div class="destaque"><a class="dst" data-x="go" data-v="loja" data-a="${esc(dl.slug)}">${dl.avatar?`<img class="avd" src="${dl.avatar}" alt="">`:`<div class="avd">${esc(dl.nome.charAt(0).toUpperCase())}</div>`}<b>${esc(dl.nome)}</b><span class="mut">${dl.vendas} ${dl.vendas==1?'venda':'vendas'}${dl.semana?' nos últimos 7 dias':''}</span></a></div>`:''}${lj.length?`<div style="text-align:center;margin-bottom:14px">${bt('todaslojas','Ver todas as lojas')}<div id="tl" class="row" style="margin-top:10px;display:none;justify-content:center">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div></div>`:''}
  ${es.length?`<h3>Atualizações de estoque</h3>`+es.map(a=>`<div class="box"><span class="tag">📦 Estoque</span> <b>${esc(a.titulo)}</b><div>${esc(a.texto)}</div><div class="mut"><a href="#" data-x="go" data-v="loja" data-a="${a.slug}">${esc(a.loja_nome)}</a> · ${new Date(a.criado).toLocaleDateString('pt-BR')}</div></div>`).join(''):''}`;
  clearInterval(tm);tm=setInterval(()=>{if(!pausa&&view=='inicio')slide(sl+1)},5000);
+ if(matchMedia('(display-mode: standalone)').matches)document.querySelector('.app')?.remove();
 }
 async function vInicioOld(){
  const [av,lj,bi,nv,dl]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos'),api('/api/lojas/destaque')]);
@@ -657,7 +663,7 @@ const A={
  pass:d=>slide(sl+Number(d.n)),
  dot:d=>slide(Number(d.i)),
  pausa:(d,t)=>{pausa=!pausa;t.textContent=pausa?'▶':'⏸'},
- instalar:()=>{if(dp){dp.prompt();dp=null}else alert('Para instalar: no iPhone, toque em Compartilhar e depois em "Adicionar à Tela de Início". No Android ou no Windows, abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".')},
+ instalar:()=>{if(dp){dp.prompt();dp.userChoice.finally(()=>{dp=null});return}const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);alert(ios?'No iPhone ou iPad: abra este site no Safari, toque no botão Compartilhar (o quadrado com uma seta) e escolha "Adicionar à Tela de Início".':'Para baixar o app: no Chrome ou no Edge, abra o menu (três pontinhos) e escolha "Instalar app" (ou "Instalar Kivra"). No Android também aparece "Adicionar à tela inicial".')},
  buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};guardarBusca(val('q'));draw()},
  todosprod:()=>{Q={q:'',classe:'',min:'',max:'',todos:'1'};vProd()},
  buy:async d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];let ends=[];try{ends=await api('/api/enderecos')}catch(e){}pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id,servico:p.classe=='servicos'},ends)},
