@@ -60,6 +60,20 @@ async function criarTabelas() {
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_status TEXT;
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS assin_check BIGINT;
   ALTER TABLE lojas ADD COLUMN IF NOT EXISTS acesso_ate BIGINT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS cep_origem TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_estado TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_cidade TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_bairro TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_rua TEXT;
+  ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_numero TEXT;
+  CREATE TABLE IF NOT EXISTS enderecos(id SERIAL PRIMARY KEY, usuario_id INTEGER, apelido TEXT, cep TEXT, estado TEXT, cidade TEXT, bairro TEXT, rua TEXT, numero TEXT, criado BIGINT);
+  ALTER TABLE produtos ADD COLUMN IF NOT EXISTS peso_g INTEGER;
+  ALTER TABLE produtos ADD COLUMN IF NOT EXISTS comp_cm INTEGER;
+  ALTER TABLE produtos ADD COLUMN IF NOT EXISTS larg_cm INTEGER;
+  ALTER TABLE produtos ADD COLUMN IF NOT EXISTS alt_cm INTEGER;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_servico TEXT;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_valor DOUBLE PRECISION;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_prazo INTEGER;
   CREATE TABLE IF NOT EXISTS chaves_acesso(id SERIAL PRIMARY KEY, codigo TEXT UNIQUE, dias INTEGER, criada BIGINT, usada_por INTEGER, usada_em BIGINT);`);
 }
 
@@ -95,7 +109,7 @@ app.use(async (req, res, next) => {
 const logado = (req, res, next) => req.u ? next() : res.status(401).json({ erro: 'Entre na sua conta.' });
 const vendedor = async (req, res, next) => {
   if (!req.u || req.u.papel !== 'vendedor') return res.status(403).json({ erro: 'Apenas vendedores.' });
-  req.loja = await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id); next();
+  req.loja = await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,cep_origem,loja_estado,loja_cidade,loja_bairro,loja_rua,loja_numero,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id); next();
 };
 const admin = (req, res, next) =>
   req.u && req.u.papel === 'admin' && req.u.email === ADMIN_EMAIL ? next() : res.status(403).json({ erro: 'Acesso negado.' });
@@ -129,7 +143,7 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
 app.get('/api/eu', async (req, res) => {
   if (!req.u) return res.json({ logado: false });
-  const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id) : null;
+  const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,cep_origem,loja_estado,loja_cidade,loja_bairro,loja_rua,loja_numero,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id) : null;
   res.json({ logado: true, email: req.u.email, papel: req.u.papel, loja, mp_pronto: mpPronto() });
 });
 
@@ -157,7 +171,7 @@ app.get('/api/lojas/destaque', async (req, res) => {
   res.json(r ? { ...r, semana: false } : {});
 });
 app.get('/api/lojas/:slug', async (req, res) => {
-  const l = await get(`SELECT l.id,l.nome,l.slug,l.quem_somos,l.whatsapp,l.avatar,l.banner FROM lojas l JOIN usuarios u ON u.id=l.usuario_id
+  const l = await get(`SELECT l.id,l.nome,l.slug,l.quem_somos,l.whatsapp,l.avatar,l.banner,l.loja_cidade,l.loja_estado FROM lojas l JOIN usuarios u ON u.id=l.usuario_id
                        WHERE l.slug=? AND u.bloqueado=0`, req.params.slug);
   if (!l) return res.status(404).json({ erro: 'Loja não encontrada.' });
   const faixa = await get('SELECT MIN(preco) AS min, MAX(preco) AS max FROM produtos WHERE loja_id=? AND estoque>0', l.id);
@@ -175,6 +189,13 @@ app.put('/api/vendedor/loja', vendedor, async (req, res) => {
   if (!txt(req.body.nome)) return res.status(400).json({ erro: 'Informe o nome da loja.' });
   if (w && w.length < 10) return res.status(400).json({ erro: 'WhatsApp inválido.' });
   await run('UPDATE lojas SET nome=?, quem_somos=?, whatsapp=?, pix=? WHERE id=?', txt(req.body.nome), txt(req.body.quem_somos), w, txt(req.body.pix), req.loja.id);
+  // endereço da loja: se preencher algum campo, precisa preencher todos (o CEP também serve de origem do frete)
+  const E = { cep: digits(req.body.cep_origem), uf: txt(req.body.loja_estado), ci: txt(req.body.loja_cidade), ba: txt(req.body.loja_bairro), ru: txt(req.body.loja_rua), nu: txt(req.body.loja_numero) };
+  if (E.cep || E.uf || E.ci || E.ba || E.ru || E.nu) {
+    if (E.cep.length !== 8 || !UFS.includes(E.uf) || !E.ci || !E.ba || !E.ru || !E.nu)
+      return res.status(400).json({ erro: 'Preencha o endereço completo da loja: CEP, estado, cidade, bairro, rua e número.' });
+    await run('UPDATE lojas SET cep_origem=?, loja_estado=?, loja_cidade=?, loja_bairro=?, loja_rua=?, loja_numero=? WHERE id=?', E.cep, E.uf, E.ci, E.ba, E.ru, E.nu, req.loja.id);
+  }
   if (ehImagem(req.body.avatar)) await run('UPDATE lojas SET avatar=? WHERE id=?', req.body.avatar, req.loja.id);
   if (ehImagem(req.body.banner)) await run('UPDATE lojas SET banner=? WHERE id=?', req.body.banner, req.loja.id);
   res.json({ ok: true });
@@ -183,13 +204,17 @@ app.get('/api/vendedor/produtos', vendedor, async (req, res) => res.json(await a
 app.post('/api/vendedor/produtos', vendedor, async (req, res) => {
   const { classe, nome, tamanho, descricao, preco, foto, estoque } = req.body;
   if (!CLASSES[classe]) return res.status(400).json({ erro: 'Classe inválida.' });
+  const L = req.loja;                // a loja precisa ter endereço antes de cadastrar produtos
+  if (!(L.cep_origem && L.loja_estado && L.loja_cidade && L.loja_bairro && L.loja_rua && L.loja_numero))
+    return res.status(400).json({ erro: 'Preencha o endereço da loja em Minha loja → Loja antes de cadastrar produtos.' });
   const d = { nome: txt(nome), tamanho: txt(tamanho) };
   for (const c of CLASSES[classe]) if (!d[c]) return res.status(400).json({ erro: `Informe o campo: ${c}.` });
   if (!txt(descricao)) return res.status(400).json({ erro: 'Informe a descrição.' });
   if (!(Number(preco) > 0)) return res.status(400).json({ erro: 'Preço inválido.' });
   if (classe !== 'servicos' && !ehImagem(foto)) return res.status(400).json({ erro: 'Adicione a foto.' });
-  await run('INSERT INTO produtos(loja_id,classe,nome,tamanho,descricao,preco,estoque,foto,criado) VALUES(?,?,?,?,?,?,?,?,?)',
-    req.loja.id, classe, d.nome, d.tamanho, txt(descricao), Number(preco), classe === 'servicos' ? 1 : Math.max(1, parseInt(estoque) || 1), ehImagem(foto) ? foto : null, Date.now());
+  await run('INSERT INTO produtos(loja_id,classe,nome,tamanho,descricao,preco,estoque,foto,criado,peso_g,comp_cm,larg_cm,alt_cm) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    req.loja.id, classe, d.nome, d.tamanho, txt(descricao), Number(preco), classe === 'servicos' ? 1 : Math.max(1, parseInt(estoque) || 1), ehImagem(foto) ? foto : null, Date.now(),
+    ...(classe === 'servicos' ? [null, null, null, null] : [intEntre(req.body.peso_g, 1, 30000), intEntre(req.body.comp_cm, 1, 100), intEntre(req.body.larg_cm, 1, 100), intEntre(req.body.alt_cm, 1, 100)]));
   res.json({ ok: true });
 });
 app.put('/api/vendedor/produtos/:id/estoque', vendedor, async (req, res) => {
@@ -252,6 +277,7 @@ app.post('/api/pedidos', logado, async (req, res) => {
     const p = await get('SELECT p.*, u.bloqueado FROM produtos p JOIN lojas l ON l.id=p.loja_id JOIN usuarios u ON u.id=l.usuario_id WHERE p.id=?', b.produto_id ?? null);
     if (!p || p.bloqueado) return res.status(404).json({ erro: 'Produto não encontrado.' });
     if (p.estoque < 1) return res.status(400).json({ erro: 'Produto sem estoque.' });
+    if (p.classe === 'servicos') return res.status(400).json({ erro: 'Serviços são combinados pelo chat da loja.' });
     loja_id = p.loja_id; produto_id = p.id; item = p.nome || p.classe; preco = p.preco;
   }
   const ehVale = !produto_id;   // vale presente não tem entrega, então não pede endereço
@@ -277,12 +303,23 @@ app.post('/api/pedidos', logado, async (req, res) => {
     valeUsado = Math.min(vale.saldo ?? vale.valor, preco - desconto);
     desconto += valeUsado;
   }
-  const final = Math.max(preco - desconto, 0);
-  const ped = await get(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,estado,telefone,comprovante,criado)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
+  let frete = null;                 // frete dos Correios: o servidor refaz a cotação e usa o preço dele, nunca o que veio do navegador
+  if (!ehVale) {
+    const pf = await get('SELECT p.*, l.cep_origem FROM produtos p JOIN lojas l ON l.id=p.loja_id WHERE p.id=?', produto_id);
+    if (pf.classe !== 'servicos' && pf.cep_origem && process.env.MELHOR_ENVIO_TOKEN) {
+      if (!b.frete_id) return res.status(400).json({ erro: 'Escolha uma opção de frete.' });
+      let ops; try { ops = await cotarFrete(pf, digits(b.cep)); } catch (e) { return res.status(e.status || 502).json({ erro: e.message }); }
+      frete = ops.find(o => String(o.id) === String(b.frete_id));
+      if (!frete) return res.status(400).json({ erro: 'Opção de frete inválida. Calcule o frete de novo.' });
+    }
+  }
+  const final = Math.max(preco - desconto, 0) + (frete ? frete.valor : 0);
+  const ped = await get(`INSERT INTO pedidos(loja_id,usuario_id,ip,produto_id,item,preco_original,desconto,preco,cupom,metodo,nome,cep,cidade,bairro,rua,numero,estado,telefone,comprovante,criado,frete_servico,frete_valor,frete_prazo)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
     loja_id, req.u.id, req.ip, produto_id, item, preco, desconto, final, cupom, b.metodo, txt(b.nome),
     ehVale ? null : digits(b.cep), ehVale ? null : txt(b.cidade), ehVale ? null : txt(b.bairro), ehVale ? null : txt(b.rua),
-    ehVale ? null : txt(b.numero), ehVale ? null : b.estado, digits(b.telefone), null, Date.now());
+    ehVale ? null : txt(b.numero), ehVale ? null : b.estado, digits(b.telefone), null, Date.now(),
+    frete ? frete.servico : null, frete ? frete.valor : null, frete ? frete.prazo : null);
   if (produto_id) await run(`UPDATE produtos SET estoque=estoque-1 WHERE id=? AND classe<>'servicos'`, produto_id);
   if (vale) await run('UPDATE vales SET saldo=saldo-?, usado=CASE WHEN saldo-?<=0.001 THEN 1 ELSE 0 END WHERE id=?', valeUsado, valeUsado, vale.id);
   const l = await get('SELECT whatsapp,pix,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', loja_id);
@@ -357,6 +394,7 @@ app.delete('/api/admin/usuarios/:id', admin, async (req, res) => {
   const l = await get('SELECT id FROM lojas WHERE usuario_id=?', u.id);
   if (l) for (const t of ['produtos', 'cupons', 'vales', 'avisos', 'pedidos']) await run(`DELETE FROM ${t} WHERE loja_id=?`, l.id);
   await run('DELETE FROM lojas WHERE usuario_id=?', u.id);
+  await run('DELETE FROM enderecos WHERE usuario_id=?', u.id);
   await run('UPDATE pedidos SET usuario_id=NULL WHERE usuario_id=?', u.id);
   await run('DELETE FROM usuarios WHERE id=?', u.id); res.json({ ok: true });
 });
@@ -476,14 +514,17 @@ app.post('/api/pedidos/:id/pagar-mp', logado, async (req, res) => {
   const token = mpPronto() ? await tokenLoja(p.loja_id) : null;
   if (!token) return res.status(400).json({ erro: 'Esta loja ainda não aceita pagamento online. Combine com o vendedor pelo chat.' });
   const corpo = {
-    items: [{ id: String(p.id), title: String(p.item).slice(0, 120), quantity: 1, currency_id: 'BRL', unit_price: Number(Number(p.preco).toFixed(2)) }],
+    items: [
+      { id: String(p.id), title: String(p.item).slice(0, 120), quantity: 1, currency_id: 'BRL', unit_price: Number((p.preco - (p.frete_valor || 0)).toFixed(2)) },
+      { id: 'frete', title: `Frete ${p.frete_servico || ''}`.trim().slice(0, 120), quantity: 1, currency_id: 'BRL', unit_price: Number(Number(p.frete_valor || 0).toFixed(2)) },
+    ].filter(i => i.unit_price > 0),
     external_reference: String(p.id),
     notification_url: `${SITE_URL}/api/mp/webhook?pedido=${p.id}`,
     back_urls: { success: `${SITE_URL}/?pagamento=ok`, failure: `${SITE_URL}/?pagamento=erro`, pending: `${SITE_URL}/?pagamento=pendente` },
     auto_return: 'approved',
   };
   const taxaPct = (await assinaturaAtiva(p.loja_id)) ? 0 : TAXA_SEM_ASSINATURA;   // assinante não paga taxa
-  const taxa = Number((p.preco * taxaPct / 100).toFixed(2));
+  const taxa = Number((Math.max(p.preco - (p.frete_valor || 0), 0) * taxaPct / 100).toFixed(2));   // a taxa não incide sobre o frete
   if (taxa > 0) corpo.marketplace_fee = taxa;
   const r = await fetch('https://api.mercadopago.com/checkout/preferences', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(corpo) });
@@ -580,7 +621,7 @@ app.post('/api/vendedor/assinatura/cancelar', vendedor, async (req, res) => {
 
 // ---------- STATUS DO MERCADO PAGO (só o ADM) ----------
 app.get('/api/admin/mp/status', admin, async (req, res) => {
-  const cfg = { site_url: !!SITE_URL, client_id: !!MP_ID, client_secret: !!MP_SECRET, access_token: !!process.env.MP_ACCESS_TOKEN };
+  const cfg = { site_url: !!SITE_URL, client_id: !!MP_ID, client_secret: !!MP_SECRET, access_token: !!process.env.MP_ACCESS_TOKEN, frete_token: !!process.env.MELHOR_ENVIO_TOKEN };
   let conta = null, erro = null;
   if (req.query.testar) {
     if (!cfg.access_token) erro = 'Falta a variável MP_ACCESS_TOKEN no Render.';
@@ -625,6 +666,70 @@ app.post('/api/vendedor/chave', vendedor, async (req, res) => {
   const ate = Math.max(Date.now(), Number(l.acesso_ate) || 0) + k.dias * 24 * 3600 * 1000;   // soma ao que já tinha
   await run('UPDATE lojas SET acesso_ate=? WHERE id=?', ate, req.loja.id);
   res.json({ ok: true, dias: k.dias, ate });
+});
+
+// Endereço leve para monitores de disponibilidade: acorda o servidor e também toca o banco
+app.get('/api/saude', async (req, res) => {
+  try { await get('SELECT 1 AS ok'); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false }); }
+});
+
+// ---------- FRETE DOS CORREIOS (cotação via Melhor Envio, sem contrato próprio) ----------
+const intEntre = (v, min, max) => { const n = parseInt(v); return n >= min && n <= max ? n : null; };
+const PADRAO = {   // embalagem usada quando o vendedor não informa peso e medidas (peso em gramas, medidas em cm)
+  roupas: { peso: 300, c: 25, l: 20, a: 5 }, calcados: { peso: 1000, c: 35, l: 25, a: 15 }, bolsas: { peso: 700, c: 35, l: 28, a: 12 },
+  perfumes: { peso: 400, c: 20, l: 15, a: 10 }, cosmeticos: { peso: 300, c: 18, l: 12, a: 8 } };
+async function cotarFrete(p, cepDestino) {
+  const token = process.env.MELHOR_ENVIO_TOKEN;
+  if (!token) throw Object.assign(new Error('O cálculo de frete ainda não está disponível. Combine o frete pelo chat.'), { status: 503 });
+  const d = PADRAO[p.classe] || PADRAO.roupas;
+  const base = process.env.ME_SANDBOX ? 'https://sandbox.melhorenvio.com.br' : 'https://melhorenvio.com.br';
+  const r = await fetch(base + '/api/v2/me/shipment/calculate', { method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json',
+               'User-Agent': `Kivra (${process.env.CONTATO_EMAIL || ADMIN_EMAIL || 'contato@kivra'})` },
+    body: JSON.stringify({ from: { postal_code: digits(p.cep_origem) }, to: { postal_code: digits(cepDestino) },
+      products: [{ id: String(p.id), weight: (p.peso_g || d.peso) / 1000, length: Math.max(p.comp_cm || d.c, 16), width: Math.max(p.larg_cm || d.l, 11),
+                   height: Math.max(p.alt_cm || d.a, 2), insurance_value: Number(p.preco), quantity: 1 }],
+      services: '1,2' }) });                                   // 1 = PAC, 2 = SEDEX (Correios)
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !Array.isArray(j)) { console.error('Melhor Envio:', r.status, JSON.stringify(j).slice(0, 300)); throw Object.assign(new Error('Não foi possível calcular o frete agora. Tente de novo ou combine pelo chat.'), { status: 502 }); }
+  return j.filter(x => !x.error && x.price != null && /correios/i.test((x.company && x.company.name) || ''))
+    .map(x => ({ id: x.id, servico: x.name, valor: Number(String(x.custom_price ?? x.price).replace(',', '.')),
+                 prazo: x.delivery_time || (x.delivery_range && x.delivery_range.max) || null }))
+    .filter(o => o.valor > 0);
+}
+const freteIp = new Map();                                    // limite simples de consultas por visitante
+app.post('/api/frete/cotar', async (req, res) => {
+  const agora = Date.now(), t = freteIp.get(req.ip) || { n: 0, ate: agora + 60000 };
+  if (agora > t.ate) { t.n = 0; t.ate = agora + 60000; }
+  t.n++; freteIp.set(req.ip, t);
+  if (t.n > 20) return res.status(429).json({ erro: 'Muitas consultas. Aguarde um minuto.' });
+  const cep = digits(req.body.cep);
+  if (cep.length !== 8) return res.status(400).json({ erro: 'CEP inválido.' });
+  const p = await get('SELECT p.*, l.cep_origem FROM produtos p JOIN lojas l ON l.id=p.loja_id WHERE p.id=?', req.body.produto_id ?? null);
+  if (!p || p.classe === 'servicos') return res.status(400).json({ erro: 'Este item não tem frete.' });
+  if (!p.cep_origem) return res.status(400).json({ erro: 'A loja ainda não informou o CEP de envio. Combine o frete pelo chat.' });
+  try { res.json({ opcoes: await cotarFrete(p, cep) }); }
+  catch (e) { res.status(e.status || 502).json({ erro: e.message }); }
+});
+
+// ---------- ENDEREÇOS SALVOS DO CLIENTE ----------
+app.get('/api/enderecos', logado, async (req, res) =>
+  res.json(await all('SELECT id,apelido,cep,estado,cidade,bairro,rua,numero FROM enderecos WHERE usuario_id=? ORDER BY id', req.u.id)));
+app.post('/api/enderecos', logado, async (req, res) => {
+  const b = req.body, cep = digits(b.cep);
+  if (!txt(b.apelido)) return res.status(400).json({ erro: 'Dê um nome ao endereço (ex.: Casa).' });
+  if (cep.length !== 8 || !UFS.includes(b.estado) || !txt(b.cidade) || !txt(b.bairro) || !txt(b.rua) || !txt(b.numero))
+    return res.status(400).json({ erro: 'Preencha todos os campos do endereço (CEP, estado, cidade, bairro, rua e número).' });
+  if ((await get('SELECT COUNT(*) AS n FROM enderecos WHERE usuario_id=?', req.u.id)).n >= 10)
+    return res.status(400).json({ erro: 'Você pode salvar até 10 endereços.' });
+  await run('INSERT INTO enderecos(usuario_id,apelido,cep,estado,cidade,bairro,rua,numero,criado) VALUES(?,?,?,?,?,?,?,?,?)',
+    req.u.id, txt(b.apelido).slice(0, 40), cep, b.estado, txt(b.cidade), txt(b.bairro), txt(b.rua), txt(b.numero), Date.now());
+  res.json({ ok: true });
+});
+app.delete('/api/enderecos/:id', logado, async (req, res) => {
+  await run('DELETE FROM enderecos WHERE id=? AND usuario_id=?', req.params.id, req.u.id);
+  res.json({ ok: true });
 });
 
 // ---------- SITE ----------

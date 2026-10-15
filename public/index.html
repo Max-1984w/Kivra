@@ -64,7 +64,7 @@ a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
 .app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#2e1c12,#b4532a);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do site</div>
+<div class="aviso">vendemos para todo o Brasil com entregas a negociar pelo chat do app, compras feitas para fora do pais não seram reembolsadas</div>
 <div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
@@ -86,6 +86,9 @@ const bt=(x,t,d='',c='')=>`<button class="${c}" data-x="${x}" ${d}>${t}</button>
 
 const UF=[['AC','Acre'],['AL','Alagoas'],['AP','Amapá'],['AM','Amazonas'],['BA','Bahia'],['CE','Ceará'],['DF','Distrito Federal'],['ES','Espírito Santo'],['GO','Goiás'],['MA','Maranhão'],['MT','Mato Grosso'],['MS','Mato Grosso do Sul'],['MG','Minas Gerais'],['PA','Pará'],['PB','Paraíba'],['PR','Paraná'],['PE','Pernambuco'],['PI','Piauí'],['RJ','Rio de Janeiro'],['RN','Rio Grande do Norte'],['RS','Rio Grande do Sul'],['RO','Rondônia'],['RR','Roraima'],['SC','Santa Catarina'],['SP','São Paulo'],['SE','Sergipe'],['TO','Tocantins']],CID={};
 const MP_ATIVO=true; // Mercado Pago ligado (troque para false para esconder os botões)
+const buscasRecentes=()=>{try{return JSON.parse(localStorage.getItem('buscas'))||[]}catch(e){return[]}};
+const guardarBusca=t=>{t=(t||'').trim().toLowerCase();if(!t)return;try{localStorage.setItem('buscas',JSON.stringify([t,...buscasRecentes().filter(x=>x!=t)].slice(0,5)))}catch(e){}};
+async function viaCep(cep,[uf,ci,ba,ru]){try{const j=await(await fetch(`https://viacep.com.br/ws/${cep}/json/`)).json();if(j.erro)return;$('#'+uf).value=j.uf||'';$('#'+ci).value=j.localidade||'';if(j.bairro)$('#'+ba).value=j.bairro;if(j.logradouro)$('#'+ru).value=j.logradouro}catch(e){}}
 const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const pk=(t,c)=>{$('#mod2').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">${t}</h3>${c}<br>${bt('fechar2','Voltar')}</div></div>`};
 let cidLista=null,mpTeste=false;
@@ -93,10 +96,10 @@ let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:''
 function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
 function nav(){
  const u=(x,t,d='')=>`<button data-x="${x}" ${d}>${t}</button>`;
- $('#util').innerHTML=(eu.logado?u('go','📦 Meus pedidos','data-v="meus"'):'')+(eu.papel=='vendedor'?u('go','🏪 Minha loja','data-v="vend"'):'')+(eu.papel=='admin'?u('go','🛡️ ADM','data-v="adm"'):'')+(eu.logado?u('sair','👤 Sair'):u('area','👤 Entre ou Cadastre-se','data-ar="cliente"')+u('area','🏪 Área do vendedor','data-ar="vendedor"'));
- $('#menu').innerHTML=Object.entries(CL).map(([k,n])=>`<a data-x="cat" data-c="${k}">${n.toUpperCase()}</a>`).join('');
+ $('#util').innerHTML=(eu.logado?u('go','📦 Meus pedidos','data-v="meus"')+u('go','📍 Meus endereços','data-v="end"'):'')+(eu.papel=='vendedor'?u('go','🏪 Minha loja','data-v="vend"'):'')+(eu.papel=='admin'?u('go','🛡️ ADM','data-v="adm"'):'')+(eu.logado?u('sair','👤 Sair'):u('area','👤 Entre ou Cadastre-se','data-ar="cliente"')+u('area','🏪 Área do vendedor','data-ar="vendedor"'));
+ $('#menu').innerHTML='<a data-x="go" data-v="prod">PRODUTOS</a>';
 }
-async function draw(){nav();app.classList.toggle('home',view=='inicio');try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+async function draw(){nav();app.classList.toggle('home',view=='inicio');try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv,end:vEnd})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
 async function init(){try{eu=await api('/api/eu')}catch(e){}
  const q=new URLSearchParams(location.search),l=q.get('loja'),mp=q.get('mp'),pg=q.get('pagamento'),ass=q.get('assinatura');
  history.replaceState(null,'',location.pathname+(l?'?loja='+encodeURIComponent(l):''));
@@ -106,13 +109,13 @@ async function init(){try{eu=await api('/api/eu')}catch(e){}
  l?go('loja',l):go('inicio')}
 
 /* ---------- vitrine ---------- */
-function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
+function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${p.classe=='servicos'?bt('chatloja','💬 Combinar com a loja',`data-id="${p.loja_id}" data-t="${esc(p.loja_nome||'Loja')}" data-m="${esc('Olá! Tenho interesse no serviço: '+String(p.descricao).slice(0,80))}"`,'p'):bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
 let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
 function slide(n){const s=document.querySelectorAll('.sl');if(!s.length)return;sl=(n+s.length)%s.length;s.forEach((e,i)=>e.classList.toggle('on',i==sl));document.querySelectorAll('.dt').forEach((e,i)=>e.classList.toggle('on',i==sl))}
 async function vInicio(){
  const [av,lj,bi,nv,dl]=await Promise.all([api('/api/inicio'),api('/api/lojas'),api('/api/banner/info'),api('/api/produtos'),api('/api/lojas/destaque')]);
- const S=[{k:'ROUPAS • CALÇADOS • BOLSAS • PERFUMES',s:'COSMÉTICOS • VALE PRESENTE',h:'Kivra',c:'Compre direto das melhores lojas',b:'COMPRAR',v:'prod'},
+ const S=[{k:'BEM-VINDO',s:'PRODUTOS DE LOJAS DE TODO O BRASIL',h:'Kivra',c:'Pesquise o que você procura',b:'COMPRAR',v:'prod'},
   ...av.filter(a=>a.tipo=='promocao').slice(0,5).map(a=>({k:a.loja_nome.toUpperCase(),s:'PROMOÇÃO',h:a.titulo,c:a.texto,b:'VER LOJA',v:'loja',a:a.slug}))];
  const es=av.filter(a=>a.tipo=='estoque');
  sl=0;
@@ -133,7 +136,15 @@ async function vProd(){
  const sel=Object.entries(CL).map(([k,n])=>`<option value="${k}" ${Q.classe==k?'selected':''}>${n}</option>`).join('');
  let lista='';
  if(Q.classe=='vale_presente'){const lj=await api('/api/lojas');lista=`<p class="mut">Escolha a loja para comprar o vale presente:</p><div class="row">${lj.map(l=>`<button data-x="go" data-v="loja" data-a="${l.slug}" style="flex:0 0 auto">🏪 ${esc(l.nome)}</button>`).join('')}</div>`}
- else{const l=await api('/api/produtos?'+new URLSearchParams(Q));lista=l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="mut">Nenhum produto encontrado.</p>'}
+ else{
+  const livre=!Q.q&&!Q.classe&&!Q.min&&!Q.max&&!Q.todos,ult=buscasRecentes().slice(0,3);
+  let l=null,tit='';
+  if(livre&&ult.length){      // sem pesquisa nova: mostra produtos parecidos com o que a pessoa pesquisou antes
+   const rs=await Promise.all(ult.map(t=>api('/api/produtos?'+new URLSearchParams({q:t})))),vis=new Set();
+   l=rs.flat().filter(p=>!vis.has(p.id)&&vis.add(p.id));
+   if(l.length)tit=`<p class="mut">Com base nas suas pesquisas: ${ult.map(esc).join(', ')}</p>`}
+  if(!l||!l.length){const p0=new URLSearchParams(Q);p0.delete('todos');l=await api('/api/produtos?'+p0)}
+  lista=tit+(l.length?`<div class="grid">${l.map(p=>card(p)).join('')}</div>`:'<p class="mut">Nenhum produto encontrado.</p>')+(tit?`<p style="text-align:center;margin-top:14px">${bt('todosprod','Ver todos os produtos')}</p>`:'')}
  app.innerHTML=`<div class="box"><label>Pesquisar</label><input id="q" value="${esc(Q.q)}" placeholder="Nome ou descrição"><div class="row"><div><label>Classe</label><select id="cl"><option value="">Todas</option>${sel}</select></div><div><label>Preço mínimo</label><input id="mn" inputmode="decimal" value="${esc(Q.min)}"></div><div><label>Preço máximo</label><input id="mx" inputmode="decimal" value="${esc(Q.max)}"></div></div>${bt('buscar','Buscar','','p')}</div>`+lista;
 }
 let lt='inicio';
@@ -144,16 +155,29 @@ async function vLoja(){
  const grade=a=>a.length?`<div class="grid">${a.map(p=>card(p)).join('')}</div>`:'<p class="mut">Sem produtos no momento.</p>';
  const body=lt=='prod'?grade(ps):lt=='vale'?`<div class="grid">${l.vales.map(v=>`<button class="vale p" data-x="vale" data-loja="${l.id}" data-v="${v}">R$ ${v}</button>`).join('')}</div><p class="mut">Não achou o valor que queria? Converse com a loja:</p>${cb()}`:
   `<div class="box"><b>Quem somos nós?</b><p>${esc(l.quem_somos)||'<span class="mut">A loja ainda não preencheu esta seção.</span>'}</p>${f.min!=null?`<span class="tag">Produtos de ${brl(f.min)} a ${brl(f.max)}</span>`:''}</div>${ps.length?'<h3>Destaques</h3>'+grade(ps.slice(0,4)):''}<br>${cb('p')}`;
- app.innerHTML=`<div class="ban" ${l.banner?`style="background-image:url('${l.banner}')"`:''}></div><div class="perfil">${l.avatar?`<img class="av" src="${l.avatar}" alt="">`:`<div class="av">${esc(l.nome.charAt(0).toUpperCase())}</div>`}<div><h2 style="margin:0">${esc(l.nome)}</h2><span class="mut">${ps.length} produtos</span></div></div><div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('ltab',n,`data-t="${k}"`,lt==k?'on':'')).join('')}</div>${body}`;
+ app.innerHTML=`<div class="ban" ${l.banner?`style="background-image:url('${l.banner}')"`:''}></div><div class="perfil">${l.avatar?`<img class="av" src="${l.avatar}" alt="">`:`<div class="av">${esc(l.nome.charAt(0).toUpperCase())}</div>`}<div><h2 style="margin:0">${esc(l.nome)}</h2><span class="mut">${l.loja_cidade?`📍 ${esc(l.loja_cidade)}/${esc(l.loja_estado)} · `:''}${ps.length} produtos</span></div></div><div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('ltab',n,`data-t="${k}"`,lt==k?'on':'')).join('')}</div>${body}`;
+}
+async function vEnd(){
+ const l=await api('/api/enderecos');
+ app.innerHTML=`<h3>Meus endereços</h3><p class="mut">Cadastre os locais onde você recebe pedidos. Na hora da compra, é só escolher um deles.</p>${l.map(e=>`<div class="box row" style="align-items:center"><div><b>${esc(e.apelido)}</b><div class="mut">${esc(e.rua)}, ${esc(e.numero)} — ${esc(e.bairro)}, ${esc(e.cidade)}/${esc(e.estado)} · CEP ${esc(e.cep)}</div></div>${bt('delend','Excluir',`data-id="${e.id}"`)}</div>`).join('')||'<p class="mut">Você ainda não cadastrou endereços.</p>'}<div class="box" style="max-width:520px"><b>Novo endereço</b>${inp('ea','Nome do endereço (ex.: Casa, Trabalho)')}${inp('ec','CEP','','inputmode="numeric" maxlength="9"')}<label>Estado</label><select id="eu2"><option value="">Escolha...</option>${UF.map(([s,n])=>`<option value="${s}">${n} (${s})</option>`).join('')}</select>${inp('ei','Cidade')}${inp('eb','Bairro')}${inp('er2','Rua')}${inp('en','Número')}<div class="err" id="ere"></div>${bt('addend','Salvar endereço','','p')}</div>`;
 }
 async function vMeus(){
  const o=await api('/api/meus-pedidos');
  app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span><br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}${MP_ATIVO&&x.mp&&x.status=='pendente'&&x.preco>0?bt('pagarmp','Pagar com Mercado Pago',`data-id="${x.id}"`,'p'):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
 }
-function pedido(it){
- cur={it};
+async function cepPronto(semVia){
+ const cep=digits(val('f_cep'));if(cep.length!=8||!cur||!cur.it)return;
+ if(!semVia){try{const r=await fetch(`https://viacep.com.br/ws/${cep}/json/`),j=await r.json();   // preenche estado, cidade, bairro e rua pelo CEP
+  if(!j.erro){const u=UF.find(x=>x[0]==j.uf);if(u){cur.uf={sigla:u[0],nome:u[1]};$('#f_uf').value=`${u[1]} (${u[0]})`}$('#f_ci').value=j.localidade||'';if(j.bairro)$('#f_ba').value=j.bairro;if(j.logradouro)$('#f_ru').value=j.logradouro}}catch(e){}}
+ const box=$('#frete');if(!box)return;box.innerHTML='Calculando frete...';cur.frete=null;$('#tot').textContent='';
+ try{const r=await api('/api/frete/cotar','POST',{produto_id:cur.it.id,cep});
+  box.innerHTML=r.opcoes.length?r.opcoes.map(o=>`<label style="display:flex;gap:8px;align-items:center;color:var(--fg);margin-bottom:6px"><input type="radio" name="fr" style="width:auto;margin:0" data-id="${o.id}" data-v="${o.valor}" data-s="${esc(o.servico)}"> ${esc(o.servico)} · ${brl(o.valor)}${o.prazo?' · '+o.prazo+' dias úteis':''}</label>`).join(''):'Nenhuma opção dos Correios para este CEP. Combine o frete pelo chat.'}
+ catch(e){box.textContent=e.message}
+}
+function pedido(it,ends=[]){
+ cur={it,ends};
  const end=it.vale?'<p class="mut">O vale presente não precisa de endereço. Quando o vendedor aprovar o pagamento, o código chega no chat.</p>'
-  :`<label>Estado</label><input id="f_uf" readonly placeholder="Toque para escolher o estado" data-x="pickuf" style="cursor:pointer"><label>Cidade</label><input id="f_ci" readonly placeholder="Toque para escolher a cidade" data-x="pickcid" style="cursor:pointer">${inp('f_cep','CEP','','inputmode="numeric" maxlength="9"')}${inp('f_ba','Bairro')}${inp('f_ru','Rua')}${inp('f_nu','Número da casa')}${inp('f_cu','Cupom de desconto (opcional)')}${inp('f_va','Código do vale presente (opcional)')}`;
+  :`${ends.length?`<label>Endereço salvo</label><select id="f_ae"><option value="">Digitar outro endereço</option>${ends.map(e=>`<option value="${e.id}">${esc(e.apelido)} — ${esc(e.rua)}, ${esc(e.numero)} (${esc(e.cidade)}/${esc(e.estado)})</option>`).join('')}</select>`:''}<label>Estado</label><input id="f_uf" readonly placeholder="Toque para escolher o estado" data-x="pickuf" style="cursor:pointer"><label>Cidade</label><input id="f_ci" readonly placeholder="Toque para escolher a cidade" data-x="pickcid" style="cursor:pointer">${inp('f_cep','CEP','','inputmode="numeric" maxlength="9"')}${it.servico?'':'<div id="frete" class="mut" style="margin:-4px 0 10px">Digite o CEP para calcular o frete dos Correios.</div><div id="tot" class="mut" style="margin-bottom:10px"></div>'}${inp('f_ba','Bairro')}${inp('f_ru','Rua')}${inp('f_nu','Número da casa')}<label style="display:flex;gap:8px;align-items:center;color:var(--fg);margin-bottom:10px"><input type="checkbox" id="f_sv" style="width:auto;margin:0"> Salvar este endereço para as próximas compras</label>${inp('f_cu','Cupom de desconto (opcional)')}${inp('f_va','Código do vale presente (opcional)')}`;
  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Finalizar pedido</h3><div class="mut">${esc(it.nome)} · ${brl(it.preco)}</div><br><label>Forma de pagamento</label><select id="f_m"><option value="pix">Pix</option><option value="credito">Cartão de crédito</option><option value="debito">Cartão de débito</option></select>${inp('f_n','Nome completo')}${inp('f_te','Telefone com DDD','','inputmode="tel"')}${end}<div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('enviar','Continuar','','p')}</div></div></div>`;
 }
 function fin(r,it,m){
@@ -163,14 +187,14 @@ function fin(r,it,m){
   :`<div class="box"><b>Pagamento no cartão de ${m=='credito'?'crédito':'débito'}</b><p>Entre em contato com o vendedor para acertar o pagamento. Quando vocês combinarem, ele aprova o seu pedido.</p></div>`;
  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${mp}${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
 }
-async function chat(url,tit){
+async function chat(url,tit,pre){
  clearInterval(ct);
  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">💬 ${esc(tit)}</h3><div id="msgs" style="height:300px;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"></div><div class="row"><input id="mt" placeholder="Escreva uma mensagem" maxlength="1000" style="margin:0;flex:4">${bt('msg','Enviar',`data-u="${esc(url)}"`,'p')}</div><br>${bt('fechar','Fechar')}</div></div>`;
  loadMsgs=async()=>{const m=await api(url),el=$('#msgs');if(!el){clearInterval(ct);return}
   const fim=el.scrollTop+el.clientHeight>=el.scrollHeight-30;
   el.innerHTML=m.mensagens.map(x=>`<div style="text-align:${x.minha?'right':'left'};margin:6px 0"><span style="display:inline-block;max-width:85%;padding:6px 10px;border-radius:12px;background:${x.minha?'var(--ac)':'var(--card)'};color:${x.minha?'#fff':'var(--fg)'};text-align:left;white-space:pre-wrap;word-break:break-word">${esc(x.texto)}</span><div class="mut" style="font-size:11px">${dt(x.criado)}</div></div>`).join('')||'<p class="mut">Nenhuma mensagem ainda. Diga olá!</p>';
   if(fim)el.scrollTop=el.scrollHeight};
- await loadMsgs();$('#msgs').scrollTop=1e9;ct=setInterval(()=>loadMsgs().catch(()=>{}),4000);
+ await loadMsgs();$('#msgs').scrollTop=1e9;if(pre)$('#mt').value=pre;ct=setInterval(()=>loadMsgs().catch(()=>{}),4000);
 }
 
 const POL=`# POLÍTICA DE PRIVACIDADE — KIVRA
@@ -542,14 +566,14 @@ async function vVend(){
 }
 function tLoja(){
  const l=eu.loja,link=location.origin+'/?loja='+l.slug;
- $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Foto de perfil da loja (deixe vazio para manter a atual)</label><input id="av" type="file" accept="image/*"><label>Banner da loja (deixe vazio para manter o atual)</label><input id="bn" type="file" accept="image/*"><label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('px','Chave Pix',l.pix)}<div class="err" id="er"></div><div class="row">${bt('salvarloja','Salvar','','p')}${bt('go','Ver minha loja',`data-v="loja" data-a="${l.slug}"`)}</div></div>
+ $('#tb').innerHTML=`<div class="box" style="max-width:520px">${inp('ln','Nome da loja',l.nome)}<label>Foto de perfil da loja (deixe vazio para manter a atual)</label><input id="av" type="file" accept="image/*"><label>Banner da loja (deixe vazio para manter o atual)</label><input id="bn" type="file" accept="image/*"><label>Quem somos nós? (conte sobre a loja e os valores)</label><textarea id="qs" rows="4">${esc(l.quem_somos)}</textarea>${inp('px','Chave Pix',l.pix)}<p><b>Endereço da loja</b> <span class="mut">(obrigatório; serve para calcular o frete dos Correios. Os clientes veem só a cidade e o estado.)</span></p>${l.cep_origem&&l.loja_estado&&l.loja_cidade&&l.loja_bairro&&l.loja_rua&&l.loja_numero?'':'<p class="err">⚠️ Preencha o endereço da loja para poder cadastrar produtos.</p>'}${inp('co','CEP',l.cep_origem||'','inputmode="numeric" maxlength="9"')}<label>Estado</label><select id="lo_uf"><option value="">Escolha...</option>${UF.map(([s,n])=>`<option value="${s}" ${l.loja_estado==s?'selected':''}>${n} (${s})</option>`).join('')}</select>${inp('lo_ci','Cidade',l.loja_cidade||'')}${inp('lo_ba','Bairro',l.loja_bairro||'')}${inp('lo_ru','Rua',l.loja_rua||'')}${inp('lo_nu','Número',l.loja_numero||'')}<div class="err" id="er"></div><div class="row">${bt('salvarloja','Salvar','','p')}${bt('go','Ver minha loja',`data-v="loja" data-a="${l.slug}"`)}</div></div>
  <div class="box" style="max-width:520px"><b>Link da sua loja</b><p style="word-break:break-all">${esc(link)}</p><div class="row">${bt('copiar','Copiar link',`data-l="${esc(link)}"`)}${bt('compartilhar','Compartilhar',`data-l="${esc(link)}"`)}</div></div>
  <div class="box" style="max-width:520px"><b>Receber pelo Mercado Pago</b><p class="mut">Conecte a sua conta para o cliente pagar com Pix, crédito ou débito e o pedido ser aprovado automaticamente. O dinheiro vai direto para a sua conta do Mercado Pago.</p>${!MP_ATIVO?'<p>🚧 <b>Em breve:</b> a opção do Mercado Pago ainda não está funcionando.</p>':l.mp_conectado?`<p>✅ Conta conectada.</p>${bt('mpdesc','Desconectar')}`:eu.mp_pronto?`<ol class="mut"><li>Clique no botão abaixo.</li><li>Entre na sua conta do Mercado Pago (você precisa ter uma).</li><li>Toque em <b>Autorizar</b>. Pronto, você volta para cá.</li></ol>${bt('mpconectar','Conectar minha conta do Mercado Pago','','p')}`:'<p class="mut">O Mercado Pago ainda está sendo configurado pela Kivra. Volte em breve.</p>'}</div>`;
 }
 async function tProd(){
  const l=await api('/api/vendedor/produtos');
  $('#tb').innerHTML=`<div class="box"><h3 style="margin-top:0">Adicionar produto</h3><label>Classe</label><select id="cl">${Object.keys(NEED).map(k=>`<option value="${k}">${CL[k]}</option>`).join('')}</select><div id="ex"></div><label id="dl">Descrição</label><textarea id="d" rows="2"></textarea>${inp('pr','Preço (digite só os números)','R$ 0,00','inputmode="numeric"')}${inp('es','Quantidade em estoque (não vale para serviços)','1','type="number" min="1"')}<label>Foto (opcional para serviços)</label><input id="ft" type="file" accept="image/*"><div class="err" id="er"></div>${bt('addprod','Adicionar','','p')}</div><div class="grid">${l.map(p=>card(p,1)).join('')}</div>`;
- const ex=()=>{const n=NEED[$('#cl').value];$('#dl').textContent=$('#cl').value=='servicos'?'Descrição do serviço':'Descrição';$('#ex').innerHTML=(n.includes('nome')?inp('nm','Nome do produto'):'')+(n.includes('tam')?inp('tm','Tamanho'):'')};ex();$('#cl').onchange=ex;
+ const ex=()=>{const n=NEED[$('#cl').value];$('#dl').textContent=$('#cl').value=='servicos'?'Descrição do serviço':'Descrição';$('#ex').innerHTML=(n.includes('nome')?inp('nm','Nome do produto'):'')+(n.includes('tam')?inp('tm','Tamanho'):'')+($('#cl').value=='servicos'?'':`<label>Embalagem para o frete (opcional; se ficar vazio, usamos um padrão da classe)</label><div class="row">${inp('pgm','Peso (g)','','inputmode="numeric"')}${inp('pcm','Comprimento (cm)','','inputmode="numeric"')}${inp('plm','Largura (cm)','','inputmode="numeric"')}${inp('pam','Altura (cm)','','inputmode="numeric"')}</div>`)};ex();$('#cl').onchange=ex;
 }
 async function tCup(){
  const l=await api('/api/vendedor/cupons');
@@ -566,7 +590,7 @@ function tAvi(){
 }
 async function tPed(){
  const o=await api('/api/vendedor/pedidos?ordem='+ord);
- $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
+ $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.frete_servico?`<p class="mut" style="margin:4px 0 0">📦 Frete ${esc(x.frete_servico)}: ${brl(x.frete_valor)}${x.frete_prazo?' · '+x.frete_prazo+' dias úteis':''}</p>`:''}${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
  $('#od').value=ord;
 }
 async function tConv(){
@@ -587,7 +611,7 @@ const relTab=r=>`<div class="box sc"><table><tr><th>Período</th><th>Vendas</th>
 async function vAdm(){
  const [u,r,bi,mps,ch]=await Promise.all([api('/api/admin/usuarios'),api('/api/admin/relatorio'),api('/api/banner/info'),api('/api/admin/mp/status'+(mpTeste?'?testar=1':'')),api('/api/admin/chaves')]);
  const ck=(n,ok)=>`<div>${ok?'✅':'❌'} <b>${n}</b> ${ok?'configurado':'faltando no Render'}</div>`;
- app.innerHTML=`<h3>Mercado Pago</h3><div class="box">${ck('SITE_URL',mps.cfg.site_url)}${ck('MP_CLIENT_ID',mps.cfg.client_id)}${ck('MP_CLIENT_SECRET',mps.cfg.client_secret)}${ck('MP_ACCESS_TOKEN',mps.cfg.access_token)}<p class="mut">Endereço de retorno (Redirect URL) que precisa estar na sua aplicação do Mercado Pago:</p><div style="word-break:break-all;font-weight:700">${esc(mps.redirect_url||'defina o SITE_URL no Render')}</div>${mps.redirect_url?bt('copiar','Copiar endereço',`data-l="${esc(mps.redirect_url)}"`):''}<p>Lojas conectadas: <b>${mps.lojas}</b> · Assinantes ativos: <b>${mps.assinantes}</b> · Taxa sem assinatura: <b>${mps.taxa_pct}%</b></p>${mps.conta?`<p>✅ Conta que recebe as assinaturas e as taxas: <b>${esc(mps.conta.apelido||'')}</b> (${esc(mps.conta.email||'sem e-mail')})</p>`:''}${mps.erro?`<p class="err">${esc(mps.erro)}</p>`:''}${bt('mptestar','Testar conexão','','p')}</div>
+ app.innerHTML=`<h3>Mercado Pago</h3><div class="box">${ck('SITE_URL',mps.cfg.site_url)}${ck('MP_CLIENT_ID',mps.cfg.client_id)}${ck('MP_CLIENT_SECRET',mps.cfg.client_secret)}${ck('MP_ACCESS_TOKEN',mps.cfg.access_token)}${ck('MELHOR_ENVIO_TOKEN (frete)',mps.cfg.frete_token)}<p class="mut">Endereço de retorno (Redirect URL) que precisa estar na sua aplicação do Mercado Pago:</p><div style="word-break:break-all;font-weight:700">${esc(mps.redirect_url||'defina o SITE_URL no Render')}</div>${mps.redirect_url?bt('copiar','Copiar endereço',`data-l="${esc(mps.redirect_url)}"`):''}<p>Lojas conectadas: <b>${mps.lojas}</b> · Assinantes ativos: <b>${mps.assinantes}</b> · Taxa sem assinatura: <b>${mps.taxa_pct}%</b></p>${mps.conta?`<p>✅ Conta que recebe as assinaturas e as taxas: <b>${esc(mps.conta.apelido||'')}</b> (${esc(mps.conta.email||'sem e-mail')})</p>`:''}${mps.erro?`<p class="err">${esc(mps.erro)}</p>`:''}${bt('mptestar','Testar conexão','','p')}</div>
  <h3>Chaves de acesso</h3><div class="box"><p class="mut">Cada chave libera o acesso de assinante (sem taxa nas vendas) por alguns dias. O lojista digita a chave em Assinatura e saldo, e o sistema confere se ela é verdadeira.</p><label>Duração da chave</label><select id="kd"><option value="7">7 dias (1 semana)</option><option value="14">14 dias (2 semanas)</option><option value="15">15 dias</option><option value="21">21 dias (3 semanas)</option><option value="30">30 dias (1 mês)</option></select>${bt('criarchave','Gerar chave','','p')}${ch.length?`<div class="sc" style="margin-top:12px"><table><tr><th>Chave</th><th>Dias</th><th>Situação</th><th></th></tr>${ch.map(k=>`<tr><td><b>${esc(k.codigo)}</b></td><td>${k.dias}</td><td>${k.usada_em?'Usada por '+esc(k.loja||'—')+' em '+new Date(k.usada_em).toLocaleDateString('pt-BR'):'Disponível'}</td><td>${k.usada_em?'':bt('copiarchave','Copiar',`data-l="${esc(k.codigo)}"`)+' '+bt('delchave','Excluir',`data-id="${k.id}"`)}</td></tr>`).join('')}</table></div>`:''}</div>
  <h3>Vídeo do banner inicial</h3><div class="box">${bi.video?`<video src="/api/banner/video?v=${bi.versao}" muted loop autoplay playsinline style="width:100%;max-height:200px;border-radius:10px;object-fit:cover"></video><p class="mut">Vídeo atual do banner.</p>`:'<p class="mut">Sem vídeo: o banner usa o fundo padrão.</p>'}<label>Enviar novo vídeo (MP4 ou WebM, curto, até 12 MB)</label><input id="vd" type="file" accept="video/mp4,video/webm"><div class="err" id="er"></div><div class="row">${bt('upvideo','Enviar vídeo','','p')}${bi.video?bt('delvideo','Remover vídeo'):''}</div></div><h3>Relatório de vendas (todas as lojas)</h3>${relTab(r)}<h3>Usuários</h3><div class="sc box"><table><tr><th>E-mail</th><th>Tipo</th><th>Loja</th><th></th></tr>${u.map(x=>`<tr><td>${esc(x.email)}</td><td>${x.papel}${x.bloqueado?' 🚫':''}</td><td>${esc(x.loja||'')}</td><td>${x.papel=='admin'?'':bt('bloq',x.bloqueado?'Desbloquear':'Bloquear',`data-id="${x.id}" data-b="${x.bloqueado?0:1}"`)+' '+bt('deluser','Excluir',`data-id="${x.id}"`)}</td></tr>`).join('')}</table></div>`;
 }
@@ -595,13 +619,15 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ addend:async()=>{const er=$('#ere');er.textContent='';try{await api('/api/enderecos','POST',{apelido:val('ea'),cep:val('ec'),estado:val('eu2'),cidade:val('ei'),bairro:val('eb'),rua:val('er2'),numero:val('en')});vEnd()}catch(e){er.textContent=e.message}},
+ delend:async d=>{if(confirm('Excluir este endereço?')){await api('/api/enderecos/'+d.id,'DELETE');vEnd()}},
  criarchave:async()=>{let r;try{r=await api('/api/admin/chaves','POST',{dias:Number(val('kd'))})}catch(e){alert(e.message);return}prompt('Chave criada para '+r.dias+' dias. Copie e envie ao lojista:',r.codigo);vAdm()},
  delchave:async d=>{if(confirm('Excluir esta chave?')){await api('/api/admin/chaves/'+d.id,'DELETE');vAdm()}},
  copiarchave:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Chave copiada!')}catch(e){prompt('Copie a chave:',d.l)}},
  usarchave:async()=>{const er=$('#erk');er.textContent='';try{const r=await api('/api/vendedor/chave','POST',{codigo:val('ck')});alert('Chave válida! Acesso liberado por '+r.dias+' dias, até '+new Date(r.ate).toLocaleDateString('pt-BR')+'.');tAss()}catch(e){er.textContent=e.message}},
  todaslojas:()=>{const t=$('#tl');t.style.display=t.style.display=='none'?'flex':'none'},
  cat:d=>{Q={q:'',classe:d.c,min:'',max:''};go('prod')},
- busca:()=>{Q={q:val('gq')||'',classe:'',min:'',max:''};go('prod')},
+ busca:()=>{Q={q:val('gq')||'',classe:'',min:'',max:''};guardarBusca(val('gq'));go('prod')},
  mptestar:()=>{mpTeste=true;vAdm()},
  assinar:async()=>{const r=await api('/api/vendedor/assinatura','POST',{email_mp:val('am')});location.href=r.url},
  assdesc:async()=>{if(confirm('Cancelar a assinatura? A taxa de '+10+'% volta a valer nas próximas vendas.')){await api('/api/vendedor/assinatura/cancelar','POST');tAss()}},
@@ -632,11 +658,12 @@ const A={
  dot:d=>slide(Number(d.i)),
  pausa:(d,t)=>{pausa=!pausa;t.textContent=pausa?'▶':'⏸'},
  instalar:()=>{if(dp){dp.prompt();dp=null}else alert('Para instalar: no iPhone, toque em Compartilhar e depois em "Adicionar à Tela de Início". No Android ou no Windows, abra o menu do navegador e escolha "Instalar app" ou "Adicionar à tela inicial".')},
- buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};draw()},
- buy:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id})},
+ buscar:()=>{Q={q:val('q'),classe:val('cl'),min:val('mn'),max:val('mx')};guardarBusca(val('q'));draw()},
+ todosprod:()=>{Q={q:'',classe:'',min:'',max:'',todos:'1'};vProd()},
+ buy:async d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}const p=P[d.id];let ends=[];try{ends=await api('/api/enderecos')}catch(e){}pedido({id:p.id,nome:p.nome||CL[p.classe],preco:p.preco,loja_id:p.loja_id,servico:p.classe=='servicos'},ends)},
  vale:d=>{if(!eu.logado){alert('Crie uma conta ou entre para comprar.');return A.area({ar:'cliente'})}pedido({vale:Number(d.v),loja_id:Number(d.loja),nome:'Vale presente R$ '+d.v,preco:Number(d.v)})},
  chat:d=>chat(`/api/pedidos/${d.id}/mensagens`,d.t),
- chatloja:d=>{if(!eu.logado){alert('Crie uma conta ou entre para conversar com a loja.');return A.area({ar:'cliente'})}chat(`/api/lojas/${d.id}/mensagens`,d.t)},
+ chatloja:d=>{if(!eu.logado){alert('Crie uma conta ou entre para conversar com a loja.');return A.area({ar:'cliente'})}chat(`/api/lojas/${d.id}/mensagens`,d.t,d.m)},
  chatconv:d=>chat(`/api/vendedor/conversas/${d.id}/mensagens`,d.t),
  compartilhar:async d=>{if(navigator.share){try{await navigator.share({title:'Minha loja',text:'Conheça a minha loja:',url:d.l})}catch(e){}}else A.copiar(d)},
  msg:async d=>{const t=val('mt');if(!t)return;await api(d.u,'POST',{texto:t});$('#mt').value='';await loadMsgs()},
@@ -648,7 +675,8 @@ const A={
  zoom:(d,t)=>{$('#mod').innerHTML=`<div class="modal"><div><img src="${t.src}" style="width:100%"><br><br><button data-x="fechar" style="width:100%">Fechar</button></div></div>`},
  enviar:async()=>{
   const {it}=cur,m=val('f_m');
-  const r=await api('/api/pedidos','POST',{produto_id:it.id,loja_id:it.loja_id,vale_valor:it.vale,metodo:m,nome:val('f_n'),telefone:val('f_te'),estado:cur.uf?.sigla,cidade:val('f_ci'),cep:val('f_cep'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu'),cupom:val('f_cu'),vale_codigo:val('f_va')});
+  const r=await api('/api/pedidos','POST',{produto_id:it.id,loja_id:it.loja_id,vale_valor:it.vale,metodo:m,nome:val('f_n'),telefone:val('f_te'),estado:cur.uf?.sigla,cidade:val('f_ci'),cep:val('f_cep'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu'),cupom:val('f_cu'),vale_codigo:val('f_va'),frete_id:cur.frete?.id});
+  if($('#f_sv')?.checked&&!val('f_ae')&&cur.uf){try{await api('/api/enderecos','POST',{apelido:'Endereço em '+val('f_ci'),cep:val('f_cep'),estado:cur.uf.sigla,cidade:val('f_ci'),bairro:val('f_ba'),rua:val('f_ru'),numero:val('f_nu')})}catch(e){}}
   fin(r,it,m);
  },
  modo:d=>{modo=d.m;vConta()},
@@ -660,9 +688,9 @@ const A={
  sair:async()=>{await api('/api/logout','POST');eu={logado:false};go('inicio')},
  tab:d=>{tab=d.t;vVend()},
  ltab:d=>{lt=d.t;vLoja()},
- salvarloja:async()=>{const a=$('#av').files[0],b=$('#bn').files[0];await api('/api/vendedor/loja','PUT',{nome:val('ln'),quem_somos:$('#qs').value,pix:val('px'),avatar:a?await img(a,400):undefined,banner:b?await img(b,1200):undefined});eu=await api('/api/eu');$('#er').textContent='Salvo ✔'},
+ salvarloja:async()=>{const a=$('#av').files[0],b=$('#bn').files[0];await api('/api/vendedor/loja','PUT',{nome:val('ln'),quem_somos:$('#qs').value,pix:val('px'),cep_origem:val('co'),loja_estado:val('lo_uf'),loja_cidade:val('lo_ci'),loja_bairro:val('lo_ba'),loja_rua:val('lo_ru'),loja_numero:val('lo_nu'),avatar:a?await img(a,400):undefined,banner:b?await img(b,1200):undefined});eu=await api('/api/eu');$('#er').textContent='Salvo ✔'},
  copiar:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Link copiado!')}catch(e){prompt('Copie o link:',d.l)}},
- addprod:async()=>{const f=$('#ft').files[0];if(!f&&val('cl')!='servicos')throw new Error('Adicione a foto.');await api('/api/vendedor/produtos','POST',{classe:val('cl'),nome:val('nm'),tamanho:val('tm'),descricao:val('d'),preco:parseInt(digits(val('pr'))||'0',10)/100,estoque:val('es'),foto:f?await img(f):undefined});tProd()},
+ addprod:async()=>{const f=$('#ft').files[0];if(!f&&val('cl')!='servicos')throw new Error('Adicione a foto.');await api('/api/vendedor/produtos','POST',{classe:val('cl'),nome:val('nm'),tamanho:val('tm'),descricao:val('d'),preco:parseInt(digits(val('pr'))||'0',10)/100,estoque:val('es'),peso_g:val('pgm'),comp_cm:val('pcm'),larg_cm:val('plm'),alt_cm:val('pam'),foto:f?await img(f):undefined});tProd()},
  estoque:async d=>{await api(`/api/vendedor/produtos/${d.id}/estoque`,'PUT',{estoque:$('#e'+d.id).value});tProd()},
  delprod:async d=>{if(confirm('Excluir produto?')){await api('/api/vendedor/produtos/'+d.id,'DELETE');tProd()}},
  addcup:async()=>{await api('/api/vendedor/cupons','POST',{codigo:val('cc'),tipo:val('ct'),valor:val('cv').replace(',','.')});tCup()},
@@ -675,7 +703,7 @@ const A={
 document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]');if(!t)return;e.preventDefault();
  try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
 document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='gq')A.busca();if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
-document.addEventListener('input',e=>{if(e.target.id=='pr'){const c=parseInt(digits(e.target.value)||'0',10);e.target.value='R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}if(e.target.id=='pq'&&cidLista)cidLista(e.target.value)});
-document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}});
+document.addEventListener('input',e=>{if(e.target.id=='co'||e.target.id=='ec'){const d=digits(e.target.value).slice(0,8);e.target.value=d.length>5?d.slice(0,5)+'-'+d.slice(5):d;if(d.length==8)viaCep(d,e.target.id=='co'?['lo_uf','lo_ci','lo_ba','lo_ru']:['eu2','ei','eb','er2'])}if(e.target.id=='f_cep'){const d=digits(e.target.value).slice(0,8);e.target.value=d.length>5?d.slice(0,5)+'-'+d.slice(5):d;if(d.length==8)cepPronto()}if(e.target.id=='pr'){const c=parseInt(digits(e.target.value)||'0',10);e.target.value='R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}if(e.target.id=='pq'&&cidLista)cidLista(e.target.value)});
+document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}if(e.target.id=='f_ae'){const a=cur.ends.find(x=>String(x.id)==e.target.value);if(a){const u=UF.find(x=>x[0]==a.estado);cur.uf={sigla:u[0],nome:u[1]};$('#f_uf').value=`${u[1]} (${u[0]})`;$('#f_ci').value=a.cidade;$('#f_cep').value=a.cep.slice(0,5)+'-'+a.cep.slice(5);$('#f_ba').value=a.bairro;$('#f_ru').value=a.rua;$('#f_nu').value=a.numero;cepPronto(true)}}if(e.target.name=='fr'){cur.frete={id:e.target.dataset.id,valor:Number(e.target.dataset.v),servico:e.target.dataset.s};const t=$('#tot');if(t)t.textContent='Frete '+cur.frete.servico+': '+brl(cur.frete.valor)+' · Produto: '+brl(cur.it.preco)+' (cupons descontam só do produto)'}});
 init();
 </script></body></html>
