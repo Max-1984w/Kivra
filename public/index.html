@@ -15,7 +15,7 @@ nav{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--bd);fle
 button,select,input,textarea{font:inherit;color:var(--fg)}
 button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;cursor:pointer}
 button.p{background:var(--ac);border-color:var(--ac);color:#fff}button.on{border-color:var(--ac);color:var(--ac)}
-main{max-width:1200px;margin:0 auto;padding:16px}main.home{padding-top:0}html,body{overflow-x:hidden}
+main{max-width:1200px;margin:0 auto;padding:16px}main.home{padding-top:0}html{overflow-x:hidden}body{overflow-x:clip}
 input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:9px;margin:4px 0 10px}
 label{font-size:13px;color:var(--mut)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
@@ -25,7 +25,7 @@ label{font-size:13px;color:var(--mut)}
 .pr{font-weight:700;font-size:18px}.mut{color:var(--mut);font-size:13px}
 .row{display:flex;gap:6px;flex-wrap:wrap}.row>*{flex:1}
 .box{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
-.modal{position:fixed;inset:0;background:#0008;display:flex;justify-content:center;overflow:auto;padding:16px}
+.modal{position:fixed;z-index:100;inset:0;background:#0008;display:flex;justify-content:center;overflow:auto;padding:16px}
 .modal>div{background:var(--bg);border-radius:12px;padding:16px;max-width:460px;width:100%;margin:auto}
 .err{color:#d33;font-size:13px;min-height:16px}
 .tag{display:inline-block;font-size:12px;background:var(--bg);border:1px solid var(--bd);border-radius:20px;padding:1px 8px}
@@ -35,7 +35,7 @@ table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px so
 .destaque{display:flex;justify-content:center;margin:8px 0 18px}
 .dst{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;color:var(--fg)}
 .avd{width:120px;height:120px;border-radius:50%;object-fit:cover;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:800;border:4px solid #fff;box-shadow:0 4px 14px #0003}
-.util{background:#1f1a17;color:#f3e7da;display:flex;justify-content:flex-end;flex-wrap:wrap}
+.util{padding-top:env(safe-area-inset-top,0px);background:#1f1a17;color:#f3e7da;display:flex;justify-content:flex-end;flex-wrap:wrap}
 .util button{background:none;border:0;border-left:1px solid #3a302a;border-radius:0;color:#f3e7da;padding:14px 18px;font-size:14px}
 .util button:hover{background:#2c231e}
 .top{display:flex;align-items:center;gap:24px;padding:18px 32px;background:#fff;border-bottom:1px solid var(--bd);flex-wrap:wrap}
@@ -46,7 +46,19 @@ table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px so
 .busca{display:flex;align-items:center;border-bottom:1px solid var(--fg);min-width:220px}
 .busca input{border:0;margin:0;background:transparent;padding:8px}
 .busca button{border:0;background:none;padding:4px 6px}
-@media(max-width:700px){.top{padding:14px 16px;gap:12px}.menu{order:3;width:100%;justify-content:flex-start}.busca{flex:1;min-width:0}.util button{padding:12px 12px;font-size:13px}}
+@media(max-width:700px){
+body{display:flex;flex-direction:column;min-height:100vh}
+main{width:100%}
+.top{order:-1;position:sticky;top:0;z-index:50;background:var(--ac);border-bottom:0;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;gap:8px 10px;flex-wrap:wrap}
+.logo{font-size:0;color:#fff;border:2px solid #fff;border-radius:9px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;flex:0 0 38px}
+.logo::before{content:'K';font:900 20px 'Playfair Display',Georgia,serif}
+.busca{flex:1 1 0;min-width:0;background:#fff;border:0;border-radius:10px;padding:0 6px}
+.busca input{font-size:16px;color:#2a1f19;padding:9px 6px}
+.menu{order:3;flex:1 1 100%;justify-content:flex-start;gap:18px}
+.menu a{color:#fff;font-size:13px}
+.util{padding-top:0;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;white-space:nowrap}
+.util button{padding:11px 12px;font-size:13px;flex:0 0 auto}
+}
 .bv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
 .ph{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2e1c12,#7a3b1f);font-weight:700;color:#f3dcc4}
 .ban{height:clamp(120px,28vw,240px);border-radius:14px;background:linear-gradient(120deg,#2e1c12,#b4532a) center/cover;border:1px solid var(--bd)}
@@ -67,7 +79,6 @@ a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
 .app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#2e1c12,#b4532a);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="aviso">vendemos para todo o Brasil, serviços devem ser combinados com o vendedor/prestador de serviços</div>
 <div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
@@ -77,6 +88,7 @@ const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const brl=v=>'R$ '+Number(v).toFixed(2).replace('.',',');
 const digits=s=>String(s||'').replace(/\D/g,'');
 const dt=t=>new Date(t).toLocaleString('pt-BR');
+const ETAPAS_L=['preparando','enviado','em_transito','entregue'],ETAPAS_ROT={preparando:'Preparando o envio',enviado:'Pedido enviado',em_transito:'Em trânsito',entregue:'Entregue'};
 const MET={pix:'Pix',credito:'Cartão de crédito',debito:'Cartão de débito',cartao:'Cartão'},ST={pendente:'⏳ Aguardando',aprovado:'✅ Aprovado',recusado:'❌ Recusado'};
 const val=i=>$('#'+i)?.value.trim();
 async function api(u,m='GET',b){
@@ -112,7 +124,7 @@ async function init(){try{eu=await api('/api/eu')}catch(e){}
  l?go('loja',l):go('inicio')}
 
 /* ---------- vitrine ---------- */
-function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${p.classe=='servicos'?bt('chatloja','💬 Combinar com a loja',`data-id="${p.loja_id}" data-t="${esc(p.loja_nome||'Loja')}" data-m="${esc('Olá! Tenho interesse no serviço: '+String(p.descricao).slice(0,80))}"`,'p'):bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
+function card(p,del){P[p.id]=p;return `<div class="card">${p.foto?`<img src="${p.foto}" alt="">`:`<div class="ph">Serviço</div>`}<div class="b">${p.nome?`<b>${esc(p.nome)}</b>`:''}<span class="mut">${CL[p.classe]}${p.tamanho?' · Tam. '+esc(p.tamanho):''}</span><div>${esc(p.descricao)}</div><div class="pr">${brl(p.preco)}</div>${p.classe=='servicos'?'<div class="mut">Os detalhes deverão ser acertados com o vendedor pelo chat.</div>':''}${p.slug&&!del?`<a href="#" class="mut" data-x="go" data-v="loja" data-a="${p.slug}">🏪 ${esc(p.loja_nome)}</a>`:''}${del?`${p.classe=='servicos'?'':`<span class="mut">Estoque: ${p.estoque}</span><div class="row"><input type="number" min="0" value="${p.estoque}" id="e${p.id}" style="margin:0">${bt('estoque','Atualizar',`data-id="${p.id}"`)}</div>`}${bt('delprod','Excluir',`data-id="${p.id}"`)}`:`${p.classe=='servicos'?bt('chatloja','💬 Combinar com a loja',`data-id="${p.loja_id}" data-t="${esc(p.loja_nome||'Loja')}" data-m="${esc('Olá! Tenho interesse no serviço: '+String(p.descricao).slice(0,80))}"`,'p'):bt('buy','Comprar',`data-id="${p.id}"`,'p')}`}</div></div>`}
 let sl=0,tm=null,pausa=false,dp=null;
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e});
 addEventListener('appinstalled',()=>{dp=null;nav()});
@@ -169,7 +181,7 @@ async function vEnd(){
 }
 async function vMeus(){
  const o=await api('/api/meus-pedidos');
- app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span><br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}${MP_ATIVO&&x.mp&&x.status=='pendente'&&x.preco>0?bt('pagarmp','Pagar com Mercado Pago',`data-id="${x.id}"`,'p'):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
+ app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.tem_end&&x.status=='aprovado'?` <span class="tag">🚚 ${ETAPAS_ROT[x.entrega_etapa]||'Aguardando envio'}</span>`:''}<br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.tem_end&&x.status=='aprovado'?bt('acompanhar','🚚 Acompanhar entrega',`data-id="${x.id}" data-t="${esc(x.item)}"`,'p'):''}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}${MP_ATIVO&&x.mp&&x.status=='pendente'&&x.preco>0?bt('pagarmp','Pagar com Mercado Pago',`data-id="${x.id}"`,'p'):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
 }
 async function cepPronto(semVia){
  const cep=digits(val('f_cep'));if(cep.length!=8||!cur||!cur.it)return;
@@ -195,7 +207,7 @@ function fin(r,it,m){
 }
 async function chat(url,tit,pre){
  clearInterval(ct);
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">💬 ${esc(tit)}</h3><div id="msgs" style="height:300px;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"></div><div class="row"><input id="mt" placeholder="Escreva uma mensagem" maxlength="1000" style="margin:0;flex:4">${bt('msg','Enviar',`data-u="${esc(url)}"`,'p')}</div><br>${bt('fechar','Fechar')}</div></div>`;
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">💬 ${esc(tit)}</h3>${pre?'<p class="mut" style="margin:0 0 8px">⚠️ Os detalhes deverão ser acertados com o vendedor pelo chat.</p>':''}<div id="msgs" style="height:300px;overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px"></div><div class="row"><input id="mt" placeholder="Escreva uma mensagem" maxlength="1000" style="margin:0;flex:4">${bt('msg','Enviar',`data-u="${esc(url)}"`,'p')}</div><br>${bt('fechar','Fechar')}</div></div>`;
  loadMsgs=async()=>{const m=await api(url),el=$('#msgs');if(!el){clearInterval(ct);return}
   const fim=el.scrollTop+el.clientHeight>=el.scrollHeight-30;
   el.innerHTML=m.mensagens.map(x=>`<div style="text-align:${x.minha?'right':'left'};margin:6px 0"><span style="display:inline-block;max-width:85%;padding:6px 10px;border-radius:12px;background:${x.minha?'var(--ac)':'var(--card)'};color:${x.minha?'#fff':'var(--fg)'};text-align:left;white-space:pre-wrap;word-break:break-word">${esc(x.texto)}</span><div class="mut" style="font-size:11px">${dt(x.criado)}</div></div>`).join('')||'<p class="mut">Nenhuma mensagem ainda. Diga olá!</p>';
@@ -596,7 +608,7 @@ function tAvi(){
 }
 async function tPed(){
  const o=await api('/api/vendedor/pedidos?ordem='+ord);
- $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.frete_servico?`<p class="mut" style="margin:4px 0 0">📦 Frete ${esc(x.frete_servico)}: ${brl(x.frete_valor)}${x.frete_prazo?' · '+x.frete_prazo+' dias úteis':''}</p>`:''}${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
+ $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.frete_servico?`<p class="mut" style="margin:4px 0 0">📦 Frete ${esc(x.frete_servico)}: ${brl(x.frete_valor)}${x.frete_prazo?' · '+x.frete_prazo+' dias úteis':''}</p>`:''}${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}${x.status=='aprovado'&&x.rua?`<div class="box" style="margin:10px 0"><b>🚚 Entrega</b> <span class="tag">${ETAPAS_ROT[x.entrega_etapa]||'Ainda não atualizada'}</span><div class="row" style="margin-top:6px"><select id="et${x.id}">${Object.entries(ETAPAS_ROT).map(([k,n])=>`<option value="${k}" ${x.entrega_etapa==k?'selected':''}>${n}</option>`).join('')}</select><input id="rt${x.id}" placeholder="Código de rastreio (se tiver)" value="${esc(x.rastreio||'')}"></div>${bt('entrega','Atualizar entrega',`data-id="${x.id}"`,'p')}</div>`:''}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
  $('#od').value=ord;
 }
 async function tConv(){
@@ -625,11 +637,16 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ entrega:async d=>{await api(`/api/vendedor/pedidos/${d.id}/entrega`,'POST',{etapa:val('et'+d.id),rastreio:val('rt'+d.id)});alert('Entrega atualizada! O cliente foi avisado no chat do pedido.');tPed()},
+ acompanhar:async d=>{
+  const e=await api(`/api/pedidos/${d.id}/entrega`),feito={};e.eventos.forEach(v=>{feito[v.etapa]=v});
+  const idx=ETAPAS_L.indexOf(e.etapa),passos=[['aprovado','Pedido aprovado',e.aprovado_em,true],...ETAPAS_L.map((k,i)=>[k,ETAPAS_ROT[k],feito[k]?feito[k].criado:null,i<=idx])];
+  $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">🚚 Entrega · ${esc(d.t)}</h3>${passos.map(([k,n,t,ok])=>`<div style="display:flex;gap:10px;align-items:flex-start;margin:12px 0"><div style="width:26px;height:26px;border-radius:50%;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:${ok?'var(--ac)':'var(--card)'};color:${ok?'#fff':'var(--mut)'};border:1px solid var(--bd)">${ok?'✓':''}</div><div><b style="${ok?'':'color:var(--mut)'}">${n}</b>${t?`<div class="mut">${dt(t)}</div>`:''}${feito[k]&&feito[k].nota?`<div class="mut">${esc(feito[k].nota)}</div>`:''}</div></div>`).join('')}${e.rastreio?`<div class="box"><div class="mut">Código de rastreio</div><div style="font-size:18px;font-weight:700;word-break:break-all">${esc(e.rastreio)}</div><div class="row" style="margin-top:8px">${bt('copiarchave','Copiar código',`data-l="${esc(e.rastreio)}"`)}<a href="https://rastreamento.correios.com.br/" target="_blank" rel="noopener"><button style="width:100%">Rastrear nos Correios</button></a></div></div>`:''}${!e.etapa?'<p class="mut">O vendedor ainda não começou a preparar o envio. Você recebe um aviso no chat a cada atualização.</p>':''}${e.prazo?`<p class="mut">Prazo estimado do frete (${esc(e.servico||'')}): ${e.prazo} dias úteis depois do envio.</p>`:''}<p class="mut">As etapas são atualizadas pelo vendedor. Para o rastreio detalhado, use o código no site dos Correios.</p>${bt('fechar','Fechar')}</div></div>`},
  addend:async()=>{const er=$('#ere');er.textContent='';try{await api('/api/enderecos','POST',{apelido:val('ea'),cep:val('ec'),estado:val('eu2'),cidade:val('ei'),bairro:val('eb'),rua:val('er2'),numero:val('en')});vEnd()}catch(e){er.textContent=e.message}},
  delend:async d=>{if(confirm('Excluir este endereço?')){await api('/api/enderecos/'+d.id,'DELETE');vEnd()}},
  criarchave:async()=>{let r;try{r=await api('/api/admin/chaves','POST',{dias:Number(val('kd'))})}catch(e){alert(e.message);return}prompt('Chave criada para '+r.dias+' dias. Copie e envie ao lojista:',r.codigo);vAdm()},
  delchave:async d=>{if(confirm('Excluir esta chave?')){await api('/api/admin/chaves/'+d.id,'DELETE');vAdm()}},
- copiarchave:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Chave copiada!')}catch(e){prompt('Copie a chave:',d.l)}},
+ copiarchave:async d=>{try{await navigator.clipboard.writeText(d.l);alert('Copiado!')}catch(e){prompt('Copie a chave:',d.l)}},
  usarchave:async()=>{const er=$('#erk');er.textContent='';try{const r=await api('/api/vendedor/chave','POST',{codigo:val('ck')});alert('Chave válida! Acesso liberado por '+r.dias+' dias, até '+new Date(r.ate).toLocaleDateString('pt-BR')+'.');tAss()}catch(e){er.textContent=e.message}},
  todaslojas:()=>{const t=$('#tl');t.style.display=t.style.display=='none'?'flex':'none'},
  cat:d=>{Q={q:'',classe:d.c,min:'',max:''};go('prod')},

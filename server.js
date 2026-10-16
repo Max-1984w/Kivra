@@ -74,6 +74,9 @@ async function criarTabelas() {
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_servico TEXT;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_valor DOUBLE PRECISION;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_prazo INTEGER;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS entrega_etapa TEXT;
+  ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS rastreio TEXT;
+  CREATE TABLE IF NOT EXISTS entrega_eventos(id SERIAL PRIMARY KEY, pedido_id INTEGER, etapa TEXT, nota TEXT, criado BIGINT);
   CREATE TABLE IF NOT EXISTS chaves_acesso(id SERIAL PRIMARY KEY, codigo TEXT UNIQUE, dias INTEGER, criada BIGINT, usada_por INTEGER, usada_em BIGINT);`);
 }
 
@@ -127,7 +130,7 @@ app.post('/api/cadastro', async (req, res) => {
   if (tipo === 'vendedor' && (!cpfOk(cpf) || !txt(nomeLoja))) return res.status(400).json({ erro: 'Vendedor precisa de CPF válido e nome da loja.' });
   const papel = email === ADMIN_EMAIL ? 'admin' : tipo;
   const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado,aceite_politica) VALUES(?,?,?,?,?,?) RETURNING id',
-    email, bcrypt.hashSync(senha, 10), papel, tipo === 'vendedor' ? digits(cpf) : null, Date.now(), Date.now());
+    email, bcrypt.hashSync(senha, 10), papel, tipo === 'vendedor' ? cifrar(digits(cpf)) : null, Date.now(), Date.now());
   if (tipo === 'vendedor') {
     let slug = slugar(nomeLoja); if (await get('SELECT 1 AS x FROM lojas WHERE slug=?', slug)) slug += '-' + crypto.randomBytes(2).toString('hex');
     await run('INSERT INTO lojas(usuario_id,slug,nome) VALUES(?,?,?)', u.id, slug, txt(nomeLoja));
@@ -326,7 +329,7 @@ app.post('/api/pedidos', logado, async (req, res) => {
   res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix, mp: !!l.mp && mpPronto() });
 });
 app.get('/api/meus-pedidos', logado, async (req, res) =>
-  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,l.nome AS loja_nome,(l.mp_access_token IS NOT NULL) AS mp
+  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,p.entrega_etapa,(p.rua IS NOT NULL) AS tem_end,l.nome AS loja_nome,(l.mp_access_token IS NOT NULL) AS mp
                       FROM pedidos p LEFT JOIN lojas l ON l.id=p.loja_id WHERE p.usuario_id=? ORDER BY p.criado DESC`, req.u.id)));
 
 // ---------- COMPROVANTE, APROVAÇÃO E CHAT ----------
@@ -732,6 +735,37 @@ app.delete('/api/enderecos/:id', logado, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- ACOMPANHAR A ENTREGA (o vendedor atualiza as etapas; o cliente acompanha) ----------
+const ETAPAS = ['preparando', 'enviado', 'em_transito', 'entregue'];
+const ROTULO = { preparando: 'Preparando o envio', enviado: 'Pedido enviado', em_transito: 'Em trânsito', entregue: 'Entregue' };
+app.post('/api/vendedor/pedidos/:id/entrega', vendedor, async (req, res) => {
+  const p = await get('SELECT * FROM pedidos WHERE id=? AND loja_id=?', req.params.id, req.loja.id);
+  if (!p) return res.status(404).json({ erro: 'Pedido não encontrado.' });
+  if (p.status !== 'aprovado' || !p.rua) return res.status(400).json({ erro: 'A entrega só é acompanhada em pedidos aprovados, com endereço de entrega.' });
+  const etapa = req.body.etapa;
+  if (!ETAPAS.includes(etapa)) return res.status(400).json({ erro: 'Etapa inválida.' });
+  const rastreio = txt(req.body.rastreio).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 30);
+  if (rastreio && rastreio.length < 8) return res.status(400).json({ erro: 'Código de rastreio inválido.' });
+  const nota = txt(req.body.nota).slice(0, 200);
+  await run(`UPDATE pedidos SET entrega_etapa=?, rastreio=COALESCE(NULLIF(?,''), rastreio) WHERE id=?`, etapa, rastreio, p.id);
+  await run('INSERT INTO entrega_eventos(pedido_id,etapa,nota,criado) VALUES(?,?,?,?)', p.id, etapa, nota || null, Date.now());
+  const cod = rastreio || p.rastreio;      // o cliente é avisado no chat do pedido
+  const msg = `📦 Entrega atualizada: ${ROTULO[etapa]}.` + (nota ? ` ${nota}` : '') + (cod && (etapa === 'enviado' || etapa === 'em_transito') ? ` Código de rastreio: ${cod}` : '');
+  await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, msg, Date.now());
+  res.json({ ok: true });
+});
+app.get('/api/pedidos/:id/entrega', logado, async (req, res) => {
+  const p = await acessoPedido(req, res); if (!p) return;
+  const eventos = await all('SELECT etapa,nota,criado FROM entrega_eventos WHERE pedido_id=? ORDER BY id', p.id);
+  res.json({ status: p.status, tem_end: !!p.rua, aprovado_em: p.aprovado_em || p.criado, etapa: p.entrega_etapa || null,
+             rastreio: p.rastreio || null, servico: p.frete_servico || null, prazo: p.frete_prazo || null, eventos });
+});
+
+async function migrarCpf() {     // criptografa CPFs antigos que ainda estavam em texto puro
+  const rows = await all(`SELECT id,cpf FROM usuarios WHERE cpf ~ '^[0-9]{11}$'`);
+  for (const u of rows) await run('UPDATE usuarios SET cpf=? WHERE id=?', cifrar(u.cpf), u.id);
+}
+
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
 app.use(express.static(PUBLIC, { setHeaders: (res, p) => { if (/(sw\.js|index\.html|manifest\.json)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
@@ -741,5 +775,5 @@ app.get('/', (req, res) => {
 });
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: 'Erro interno do servidor.' }); });
 
-criarTabelas().then(() => app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000))))
+criarTabelas().then(migrarCpf).then(() => app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000))))
   .catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
