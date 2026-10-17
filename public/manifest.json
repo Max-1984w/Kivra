@@ -27,5 +27,9 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "id": "/",
+  "categories": [
+    "shopping"
   ]
 }
