@@ -32,6 +32,9 @@ label{font-size:13px;color:var(--mut)}
 .vale{font-size:20px;font-weight:700;padding:16px 8px}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid var(--bd);text-align:left}
 .sc{overflow-x:auto}
+.bnav{display:none}
+.bd{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:#d33;color:#fff;font-size:11px;font-weight:700;text-align:center;padding:0 5px;margin-left:6px;vertical-align:middle}
+.menu a.on{color:var(--ac);border-bottom:2px solid var(--ac)}
 .destaque{display:flex;justify-content:center;margin:8px 0 18px}
 .dst{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;color:var(--fg)}
 .avd{width:120px;height:120px;border-radius:50%;object-fit:cover;background:var(--ac);color:#fff;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:800;border:4px solid #fff;box-shadow:0 4px 14px #0003}
@@ -54,10 +57,14 @@ main{width:100%}
 .logo::before{content:'K';font:900 20px 'Playfair Display',Georgia,serif}
 .busca{flex:1 1 0;min-width:0;background:#fff;border:0;border-radius:10px;padding:0 6px}
 .busca input{font-size:16px;color:#2a1f19;padding:9px 6px}
-.menu{order:3;flex:1 1 100%;justify-content:flex-start;gap:18px}
-.menu a{color:#fff;font-size:13px}
-.util{padding-top:0;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;white-space:nowrap}
-.util button{padding:11px 12px;font-size:13px;flex:0 0 auto}
+.menu{display:none}
+.util{display:none}
+body{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+.bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+.bnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 6px;font-size:11px;color:var(--mut);position:relative;cursor:pointer}
+.bnav a .ic{font-size:22px;line-height:1}
+.bnav a.on{color:var(--ac);font-weight:700}
+.bnav .bd{position:absolute;top:2px;left:calc(50% + 8px);margin:0}
 }
 .bv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
 .ph{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2e1c12,#7a3b1f);font-weight:700;color:#f3dcc4}
@@ -79,7 +86,7 @@ a{color:var(--ac2)}button.on{color:var(--ac2);border-color:var(--ac2)}
 .app{margin:16px 0;border-radius:12px;background:linear-gradient(90deg,#2e1c12,#b4532a);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:18px 22px;color:#fff}
 .app button{background:#fff;color:#111;border:0;font-weight:700}
 </style></head><body>
-<div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div>
+<div class="util" id="util"></div><header class="top"><a class="logo" data-x="go" data-v="inicio">KIVRA</a><nav class="menu" id="menu"></nav><div class="busca"><input id="gq" placeholder="Faça uma pesquisa..." autocomplete="off"><button data-x="busca" aria-label="Buscar">🔍</button></div></header><main id="app"></main><footer class="mut" style="text-align:center;padding:24px 16px"><a href="#" data-x="go" data-v="priv">Política de Privacidade</a> · Kivra</footer><div id="mod"></div><div id="mod2"></div><nav class="bnav" id="bnav"></nav>
 <script>
 const CL={roupas:'Roupas',bolsas:'Bolsas',cosmeticos:'Cosméticos',calcados:'Calçados',perfumes:'Perfumes',servicos:'Serviços',vale_presente:'Vale presente'};
 const NEED={roupas:['tam'],calcados:['tam'],bolsas:[],perfumes:['nome'],cosmeticos:['nome'],servicos:[]};
@@ -106,15 +113,24 @@ const guardarBusca=t=>{t=(t||'').trim().toLowerCase();if(!t)return;try{localStor
 async function viaCep(cep,[uf,ci,ba,ru]){try{const j=await(await fetch(`https://viacep.com.br/ws/${cep}/json/`)).json();if(j.erro)return;$('#'+uf).value=j.uf||'';$('#'+ci).value=j.localidade||'';if(j.bairro)$('#'+ba).value=j.bairro;if(j.logradouro)$('#'+ru).value=j.logradouro}catch(e){}}
 const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const pk=(t,c)=>{$('#mod2').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">${t}</h3>${c}<br>${bt('fechar2','Voltar')}</div></div>`};
-let cidLista=null,mpTeste=false;
+let cidLista=null,mpTeste=false,badges={notif:0,chat:0};
 let eu={logado:false},view='inicio',arg=null,tab='loja',Q={q:'',classe:'',min:'',max:''},P={},ord='recentes',modo='entrar',cur=null,ar='cliente',ct=null,loadMsgs=null;
-function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw()}
+function go(v,a){if(v=='loja')lt='inicio';view=v;arg=a;draw();carregarBadges()}
+const ABAS=[['inicio','🏠','Início'],['notif','🔔','Notificações'],['chats','💬','Chat'],['perfil','👤','Meu perfil']];
+const ABA_DE={inicio:'inicio',notif:'notif',chats:'chats',perfil:'perfil',meus:'perfil',end:'perfil',vend:'perfil',adm:'perfil',conta:'perfil',priv:'perfil'};
+async function carregarBadges(){
+ if(!eu.logado){badges={notif:0,chat:0};nav();return}
+ try{badges=await api('/api/badges')}catch(e){return}
+ nav()}
+setInterval(()=>{if(!document.hidden&&eu.logado)carregarBadges()},30000);
 function nav(){
  const u=(x,t,d='')=>`<button data-x="${x}" ${d}>${t}</button>`;
  $('#util').innerHTML=(matchMedia('(display-mode: standalone)').matches?'':u('instalar','📲 Baixar app'))+(eu.logado?u('go','📦 Meus pedidos','data-v="meus"')+u('go','📍 Meus endereços','data-v="end"'):'')+(eu.papel=='vendedor'?u('go','🏪 Minha loja','data-v="vend"'):'')+(eu.papel=='admin'?u('go','🛡️ ADM','data-v="adm"'):'')+(eu.logado?u('sair','👤 Sair'):u('area','👤 Entre ou Cadastre-se','data-ar="cliente"')+u('area','🏪 Área do vendedor','data-ar="vendedor"'));
- $('#menu').innerHTML='<a data-x="go" data-v="prod">PRODUTOS</a>';
+ const at=ABA_DE[view],bd=k=>{const n=k=='notif'?badges.notif:k=='chats'?badges.chat:0;return n?`<span class="bd">${n>99?'99+':n}</span>`:''};
+ $('#menu').innerHTML=ABAS.map(([k,i,n])=>`<a data-x="go" data-v="${k}" class="${at==k?'on':''}">${n}${bd(k)}</a>`).join('');
+ $('#bnav').innerHTML=ABAS.map(([k,i,n])=>`<a data-x="go" data-v="${k}" class="${at==k?'on':''}"><span class="ic">${i}</span>${n}${bd(k)}</a>`).join('');
 }
-async function draw(){nav();app.classList.toggle('home',view=='inicio');try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv,end:vEnd})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
+async function draw(){nav();app.classList.toggle('home',view=='inicio');try{await({inicio:vInicio,prod:vProd,loja:vLoja,meus:vMeus,conta:vConta,vend:vVend,adm:vAdm,priv:vPriv,end:vEnd,notif:vNotif,chats:vChats,perfil:vPerfil})[view]()}catch(e){app.innerHTML=`<p class="err">${esc(e.message)}</p>`}}
 async function init(){try{eu=await api('/api/eu')}catch(e){}
  const q=new URLSearchParams(location.search),l=q.get('loja'),mp=q.get('mp'),pg=q.get('pagamento'),ass=q.get('assinatura');
  history.replaceState(null,'',location.pathname+(l?'?loja='+encodeURIComponent(l):''));
@@ -174,6 +190,25 @@ async function vLoja(){
  const body=lt=='prod'?grade(ps):lt=='vale'?`<div class="grid">${l.vales.map(v=>`<button class="vale p" data-x="vale" data-loja="${l.id}" data-v="${v}">R$ ${v}</button>`).join('')}</div><p class="mut">Não achou o valor que queria? Converse com a loja:</p>${cb()}`:
   `<div class="box"><b>Quem somos nós?</b><p>${esc(l.quem_somos)||'<span class="mut">A loja ainda não preencheu esta seção.</span>'}</p>${f.min!=null?`<span class="tag">Produtos de ${brl(f.min)} a ${brl(f.max)}</span>`:''}</div>${ps.length?'<h3>Destaques</h3>'+grade(ps.slice(0,4)):''}<br>${cb('p')}`;
  app.innerHTML=`<div class="ban" ${l.banner?`style="background-image:url('${l.banner}')"`:''}></div><div class="perfil">${l.avatar?`<img class="av" src="${l.avatar}" alt="">`:`<div class="av">${esc(l.nome.charAt(0).toUpperCase())}</div>`}<div><h2 style="margin:0">${esc(l.nome)}</h2><span class="mut">${l.loja_cidade?`📍 ${esc(l.loja_cidade)}/${esc(l.loja_estado)} · `:''}${ps.length} produtos</span></div></div><div class="row" style="margin-bottom:14px">${T.map(([k,n])=>bt('ltab',n,`data-t="${k}"`,lt==k?'on':'')).join('')}</div>${body}`;
+}
+function pedeLogin(msg){app.innerHTML=`<div class="box" style="max-width:420px;margin:30px auto;text-align:center"><p>${esc(msg)}</p>${bt('area','Entre ou Cadastre-se','data-ar="cliente"','p')}</div>`}
+async function vNotif(){
+ if(!eu.logado)return pedeLogin('Entre na sua conta para ver as notificações.');
+ const l=await api('/api/notificacoes');
+ app.innerHTML=`<h3>🔔 Notificações</h3>`+(l.length?l.map(n=>`<div class="box" style="${n.lida?'':'border-color:var(--ac)'}"><div class="row" style="align-items:center"><div style="flex:3"><b>${esc(n.titulo)}</b>${n.lida?'':' <span class="tag">novo</span>'}<div>${esc(n.texto)}</div><div class="mut">${dt(n.criada)}</div></div>${bt('abrirnotif','Ver',`data-d="${esc(n.destino||'')}"`)}</div></div>`).join(''):'<p class="mut">Você ainda não tem notificações. Elas aparecem quando um pedido é feito, aprovado, pago ou enviado.</p>');
+ if(l.some(n=>!n.lida)){await api('/api/notificacoes/lidas','POST');badges.notif=0;nav()}
+}
+async function vChats(){
+ if(!eu.logado)return pedeLogin('Entre na sua conta para ver as suas conversas.');
+ const l=await api('/api/conversas');
+ app.innerHTML=`<h3>💬 Chat</h3>`+(l.length?l.map(c=>`<div class="box" data-x="abrirconv" data-u="${esc(c.url)}" data-t="${esc(c.titulo)}" style="cursor:pointer"><div class="row" style="align-items:center"><div style="flex:4;min-width:0"><b>${esc(c.titulo)}</b>${c.nao_lidas?`<span class="bd">${c.nao_lidas}</span>`:''}<div class="mut">${esc(c.sub||'')}</div><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.ultima)}</div></div><div class="mut" style="flex:1;text-align:right;font-size:12px">${c.quando?dt(c.quando):''}</div></div></div>`).join(''):'<p class="mut">Nenhuma conversa ainda. Para conversar, abra uma loja e toque em "Conversar com a loja", ou faça um pedido.</p>');
+}
+async function vPerfil(){
+ const it=(x,t,d='')=>`<button data-x="${x}" ${d} style="width:100%;text-align:left;padding:14px">${t}</button>`;
+ const comum=it('instalar','📲 Baixar app')+it('go','📄 Política de Privacidade','data-v="priv"');
+ if(!eu.logado){app.innerHTML=`<div class="box" style="max-width:440px;margin:20px auto;text-align:center"><div class="avd" style="margin:0 auto 10px">👤</div><b>Entre para ver o seu perfil</b><p class="mut">Compre, converse com as lojas e acompanhe as entregas.</p>${bt('area','Entre ou Cadastre-se','data-ar="cliente"','p')}<br><br>${bt('area','🏪 Área do vendedor','data-ar="vendedor"')}</div><div class="grid" style="max-width:440px;margin:0 auto">${comum}</div>`;return}
+ const papel={cliente:'Cliente',vendedor:'Lojista',admin:'Administrador'}[eu.papel]||'';
+ app.innerHTML=`<div class="box" style="display:flex;gap:14px;align-items:center"><div class="avd" style="width:64px;height:64px;font-size:28px;flex:0 0 64px">${esc(eu.email.charAt(0).toUpperCase())}</div><div style="min-width:0"><b style="word-break:break-all">${esc(eu.email)}</b><div class="mut">${papel}</div></div></div><div class="grid">${it('go','📦 Meus pedidos','data-v="meus"')}${it('go','📍 Meus endereços','data-v="end"')}${eu.papel=='vendedor'?it('go','🏪 Minha loja','data-v="vend"'):''}${eu.papel=='admin'?it('go','🛡️ ADM','data-v="adm"'):''}${comum}${it('sair','Sair')}</div>`;
 }
 async function vEnd(){
  const l=await api('/api/enderecos');
@@ -637,6 +672,8 @@ async function vAdm(){
 /* ---------- ações (um clique = uma função) ---------- */
 const A={
  go:d=>go(d.v,d.a),
+ abrirconv:d=>chat(d.u,d.t),
+ abrirnotif:d=>{if(d.d=='vend-ped'){tab='ped';go('vend')}else go('meus')},
  entrega:async d=>{await api(`/api/vendedor/pedidos/${d.id}/entrega`,'POST',{etapa:val('et'+d.id),rastreio:val('rt'+d.id)});alert('Entrega atualizada! O cliente foi avisado no chat do pedido.');tPed()},
  acompanhar:async d=>{
   const e=await api(`/api/pedidos/${d.id}/entrega`),feito={};e.eventos.forEach(v=>{feito[v.etapa]=v});
@@ -694,7 +731,7 @@ const A={
  comp:async d=>{const f=$('#cp')?.files[0];if(!f)throw new Error('Escolha a foto do comprovante.');await api(`/api/pedidos/${d.id}/comprovante`,'PUT',{comprovante:await img(f,900)});alert('Comprovante enviado! O vendedor vai conferir e aprovar o seu pedido.');if(view=='meus'){A.fechar();vMeus()}else $('#cp').value=''},
  compmodal:d=>{$('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Comprovante do Pix</h3><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div><div class="row">${bt('fechar','Cancelar')}${bt('comp','Enviar',`data-id="${d.id}"`,'p')}</div></div></div>`},
  status:async d=>{if(!confirm(d.s=='aprovado'?'Aprovar este pedido?':'Recusar este pedido?'))return;await api(`/api/vendedor/pedidos/${d.id}/status`,'POST',{status:d.s});tPed()},
- fechar:()=>{clearInterval(ct);$('#mod').innerHTML='';$('#mod2').innerHTML=''},
+ fechar:()=>{clearInterval(ct);$('#mod').innerHTML='';$('#mod2').innerHTML='';carregarBadges();if(view=='chats')vChats()},
  zoom:(d,t)=>{$('#mod').innerHTML=`<div class="modal"><div><img src="${t.src}" style="width:100%"><br><br><button data-x="fechar" style="width:100%">Fechar</button></div></div>`},
  enviar:async()=>{
   const {it}=cur,m=val('f_m');
