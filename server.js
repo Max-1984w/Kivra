@@ -76,6 +76,8 @@ async function criarTabelas() {
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS frete_prazo INTEGER;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS entrega_etapa TEXT;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS rastreio TEXT;
+  CREATE TABLE IF NOT EXISTS notificacoes(id SERIAL PRIMARY KEY, usuario_id INTEGER, tipo TEXT, titulo TEXT, texto TEXT, destino TEXT, criada BIGINT, lida INTEGER DEFAULT 0);
+  CREATE TABLE IF NOT EXISTS leituras(usuario_id INTEGER, chave TEXT, lida_ate INTEGER, PRIMARY KEY (usuario_id, chave));
   CREATE TABLE IF NOT EXISTS entrega_eventos(id SERIAL PRIMARY KEY, pedido_id INTEGER, etapa TEXT, nota TEXT, criado BIGINT);
   CREATE TABLE IF NOT EXISTS chaves_acesso(id SERIAL PRIMARY KEY, codigo TEXT UNIQUE, dias INTEGER, criada BIGINT, usada_por INTEGER, usada_em BIGINT);`);
 }
@@ -325,6 +327,8 @@ app.post('/api/pedidos', logado, async (req, res) => {
     frete ? frete.servico : null, frete ? frete.valor : null, frete ? frete.prazo : null);
   if (produto_id) await run(`UPDATE produtos SET estoque=estoque-1 WHERE id=? AND classe<>'servicos'`, produto_id);
   if (vale) await run('UPDATE vales SET saldo=saldo-?, usado=CASE WHEN saldo-?<=0.001 THEN 1 ELSE 0 END WHERE id=?', valeUsado, valeUsado, vale.id);
+  const dono = await get('SELECT usuario_id FROM lojas WHERE id=?', loja_id);
+  await notificar(dono && dono.usuario_id, 'pedido', 'Novo pedido', `#${ped.id} · ${item}`, 'vend-ped');
   const l = await get('SELECT whatsapp,pix,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', loja_id);
   res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix, mp: !!l.mp && mpPronto() });
 });
@@ -356,6 +360,7 @@ app.put('/api/pedidos/:id/comprovante', logado, async (req, res) => {
 app.get('/api/pedidos/:id/mensagens', logado, async (req, res) => {
   const p = await acessoPedido(req, res); if (!p) return;
   const m = await all('SELECT id,autor_id,texto,criado FROM mensagens WHERE pedido_id=? ORDER BY id', p.id);
+  if (m.length) await marcarLida(req.u.id, `p:${p.id}`, m[m.length - 1].id);
   res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
 });
 app.post('/api/pedidos/:id/mensagens', logado, async (req, res) => {
@@ -372,6 +377,7 @@ app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
   const st = req.body.status;
   if (!['aprovado', 'recusado'].includes(st)) return res.status(400).json({ erro: 'Status inválido.' });
   await run('UPDATE pedidos SET status=?, aprovado_em=? WHERE id=?', st, Date.now(), p.id);
+  await notificar(p.usuario_id, 'pedido', st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌', `#${p.id} · ${p.item}`, 'meus');
   let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
   if (st === 'recusado' && p.produto_id) await run(`UPDATE produtos SET estoque=estoque+1 WHERE id=? AND classe<>'servicos'`, p.produto_id);
   if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
@@ -398,6 +404,8 @@ app.delete('/api/admin/usuarios/:id', admin, async (req, res) => {
   if (l) for (const t of ['produtos', 'cupons', 'vales', 'avisos', 'pedidos']) await run(`DELETE FROM ${t} WHERE loja_id=?`, l.id);
   await run('DELETE FROM lojas WHERE usuario_id=?', u.id);
   await run('DELETE FROM enderecos WHERE usuario_id=?', u.id);
+  await run('DELETE FROM notificacoes WHERE usuario_id=?', u.id);
+  await run('DELETE FROM leituras WHERE usuario_id=?', u.id);
   await run('UPDATE pedidos SET usuario_id=NULL WHERE usuario_id=?', u.id);
   await run('DELETE FROM usuarios WHERE id=?', u.id); res.json({ ok: true });
 });
@@ -406,6 +414,7 @@ app.get('/api/admin/relatorio', admin, async (req, res) => res.json(await relato
 // ---------- CHAT COM A LOJA (antes de comprar) ----------
 const msgsLoja = async (req, res, lojaId, clienteId) => {
   const m = await all('SELECT id,autor_id,texto,criado FROM mensagens WHERE loja_id=? AND cliente_id=? AND pedido_id IS NULL ORDER BY id', lojaId, clienteId);
+  if (m.length) await marcarLida(req.u.id, `l:${lojaId}:${clienteId}`, m[m.length - 1].id);
   res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
 };
 const enviaLoja = async (req, res, lojaId, clienteId) => {
@@ -563,6 +572,9 @@ app.all('/api/mp/webhook', async (req, res) => {
       msg += ` Código do seu vale presente: ${codigo}`;
     }
     await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, null, msg, Date.now());
+    const donoMp = await get('SELECT usuario_id FROM lojas WHERE id=?', p.loja_id);
+    await notificar(p.usuario_id, 'pagamento', 'Pagamento confirmado ✅', `#${p.id} · ${p.item}`, 'meus');
+    await notificar(donoMp && donoMp.usuario_id, 'pagamento', 'Pagamento recebido ✅', `#${p.id} · ${p.item}`, 'vend-ped');
   } catch (e) { console.error('Webhook MP:', e.message); }
 });
 
@@ -749,6 +761,7 @@ app.post('/api/vendedor/pedidos/:id/entrega', vendedor, async (req, res) => {
   const nota = txt(req.body.nota).slice(0, 200);
   await run(`UPDATE pedidos SET entrega_etapa=?, rastreio=COALESCE(NULLIF(?,''), rastreio) WHERE id=?`, etapa, rastreio, p.id);
   await run('INSERT INTO entrega_eventos(pedido_id,etapa,nota,criado) VALUES(?,?,?,?)', p.id, etapa, nota || null, Date.now());
+  await notificar(p.usuario_id, 'entrega', 'Entrega atualizada 🚚', `#${p.id} · ${ROTULO[etapa]}`, 'meus');
   const cod = rastreio || p.rastreio;      // o cliente é avisado no chat do pedido
   const msg = `📦 Entrega atualizada: ${ROTULO[etapa]}.` + (nota ? ` ${nota}` : '') + (cod && (etapa === 'enviado' || etapa === 'em_transito') ? ` Código de rastreio: ${cod}` : '');
   await run('INSERT INTO mensagens(pedido_id,autor_id,texto,criado) VALUES(?,?,?,?)', p.id, req.u.id, msg, Date.now());
@@ -765,6 +778,68 @@ async function migrarCpf() {     // criptografa CPFs antigos que ainda estavam e
   const rows = await all(`SELECT id,cpf FROM usuarios WHERE cpf ~ '^[0-9]{11}$'`);
   for (const u of rows) await run('UPDATE usuarios SET cpf=? WHERE id=?', cifrar(u.cpf), u.id);
 }
+
+// ---------- NOTIFICAÇÕES, CHAT (CAIXA DE ENTRADA) E CONTADORES ----------
+const notificar = (uid, tipo, titulo, texto, destino) => uid
+  ? run('INSERT INTO notificacoes(usuario_id,tipo,titulo,texto,destino,criada) VALUES(?,?,?,?,?,?)', uid, tipo, titulo, texto, destino, Date.now()).catch(e => console.error('notificar:', e.message))
+  : null;
+const marcarLida = (uid, chave, ate) => run(
+  'INSERT INTO leituras(usuario_id,chave,lida_ate) VALUES(?,?,?) ON CONFLICT (usuario_id,chave) DO UPDATE SET lida_ate=GREATEST(leituras.lida_ate, EXCLUDED.lida_ate)', uid, chave, ate);
+app.get('/api/notificacoes', logado, async (req, res) =>
+  res.json(await all('SELECT id,tipo,titulo,texto,destino,criada,lida FROM notificacoes WHERE usuario_id=? ORDER BY id DESC LIMIT 50', req.u.id)));
+app.post('/api/notificacoes/lidas', logado, async (req, res) => {
+  await run('UPDATE notificacoes SET lida=1 WHERE usuario_id=? AND lida=0', req.u.id);
+  res.json({ ok: true });
+});
+const lojaDoUsuario = async u => u.papel === 'vendedor' ? ((await get('SELECT id FROM lojas WHERE usuario_id=?', u.id)) || {}).id || null : null;
+app.get('/api/badges', logado, async (req, res) => {       // números que aparecem nas abas
+  const eu = req.u.id, lojaId = await lojaDoUsuario(req.u);
+  const n = (await get('SELECT COUNT(*) AS n FROM notificacoes WHERE usuario_id=? AND lida=0', eu)).n;
+  const c = (await get(`SELECT COUNT(*) AS n FROM mensagens m
+      LEFT JOIN pedidos p ON p.id=m.pedido_id
+      LEFT JOIN leituras l ON l.usuario_id=? AND l.chave = CASE WHEN m.pedido_id IS NOT NULL THEN 'p:'||m.pedido_id ELSE 'l:'||m.loja_id||':'||m.cliente_id END
+    WHERE ((m.pedido_id IS NOT NULL AND (p.usuario_id=? OR p.loja_id=?)) OR (m.pedido_id IS NULL AND (m.cliente_id=? OR m.loja_id=?)))
+      AND m.id > COALESCE(l.lida_ate,0) AND m.autor_id IS DISTINCT FROM ?`, eu, eu, lojaId, eu, lojaId, eu)).n;
+  res.json({ notif: n, chat: c });
+});
+app.get('/api/conversas', logado, async (req, res) => {    // caixa de entrada: pedidos e conversas com lojas
+  const eu = req.u.id, lojaId = await lojaDoUsuario(req.u);
+  const rows = await all(`WITH mm AS (
+      SELECT m.id, m.autor_id, CASE WHEN m.pedido_id IS NOT NULL THEN 'p:'||m.pedido_id ELSE 'l:'||m.loja_id||':'||m.cliente_id END AS chave
+      FROM mensagens m LEFT JOIN pedidos p ON p.id=m.pedido_id
+      WHERE (m.pedido_id IS NOT NULL AND (p.usuario_id=? OR p.loja_id=?)) OR (m.pedido_id IS NULL AND (m.cliente_id=? OR m.loja_id=?)))
+    SELECT mm.chave, MAX(mm.id) AS ultimo_id, COUNT(*) FILTER (WHERE mm.id > COALESCE(l.lida_ate,0) AND mm.autor_id IS DISTINCT FROM ?) AS nao_lidas
+    FROM mm LEFT JOIN leituras l ON l.usuario_id=? AND l.chave=mm.chave
+    GROUP BY mm.chave, l.lida_ate ORDER BY ultimo_id DESC LIMIT 50`, eu, lojaId, eu, lojaId, eu, eu);
+  if (!rows.length) return res.json([]);
+  for (const r of rows) { const [t, a, b] = r.chave.split(':'); r.t = t; r.a = Number(a); r.b = Number(b); }
+  const pids = rows.filter(r => r.t === 'p').map(r => r.a), lids = rows.filter(r => r.t === 'l').map(r => r.a), cids = rows.filter(r => r.t === 'l').map(r => r.b);
+  const P = pids.length ? await all(`SELECT p.id,p.item,p.nome,p.usuario_id,l.nome AS loja FROM pedidos p JOIN lojas l ON l.id=p.loja_id WHERE p.id IN (${pids.join(',')})`) : [];
+  const Ls = lids.length ? await all(`SELECT id,nome FROM lojas WHERE id IN (${lids.join(',')})`) : [];
+  const Cs = cids.length ? await all(`SELECT id,email FROM usuarios WHERE id IN (${cids.join(',')})`) : [];
+  const U = await all(`SELECT id,texto,criado FROM mensagens WHERE id IN (${rows.map(r => Number(r.ultimo_id)).join(',')})`);
+  res.json(rows.map(r => {
+    const u = U.find(x => x.id === r.ultimo_id) || {};
+    if (r.t === 'p') {
+      const p = P.find(x => x.id === r.a) || {};
+      return { url: `/api/pedidos/${r.a}/mensagens`, titulo: `#${r.a} · ${p.item || 'Pedido'}`, sub: p.usuario_id === eu ? p.loja : `Comprador: ${p.nome}`, ultima: u.texto || '', quando: u.criado, nao_lidas: r.nao_lidas };
+    }
+    const comprador = r.b === eu;
+    return { url: comprador ? `/api/lojas/${r.a}/mensagens` : `/api/vendedor/conversas/${r.b}/mensagens`,
+      titulo: comprador ? ((Ls.find(x => x.id === r.a) || {}).nome || 'Loja') : ((Cs.find(x => x.id === r.b) || {}).email || 'Cliente'),
+      sub: 'Conversa antes da compra', ultima: u.texto || '', quando: u.criado, nao_lidas: r.nao_lidas };
+  }));
+});
+
+// Digital Asset Links: prova ao Android que o app (APK) pertence a este site e some com a barra do navegador.
+// O conteúdo vem da variável ASSETLINKS_JSON do Render (o PWABuilder gera esse arquivo junto com o APK).
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  // aceita o texto da variável ASSETLINKS_JSON (com ou sem aspas em volta) ou, se ela não existir, o arquivo public/assetlinks.json
+  let txt = String(process.env.ASSETLINKS_JSON || '').trim().replace(/^(['"])([\s\S]*)\1$/, '$2');
+  if (!txt) { try { txt = fs.readFileSync(path.join(PUBLIC, 'assetlinks.json'), 'utf8'); } catch (e) { txt = '[]'; } }
+  try { res.json(JSON.parse(txt)); }
+  catch (e) { res.status(500).json({ erro: 'O conteúdo do assetlinks não é um JSON válido. Cole o arquivo inteiro, começando em [ e terminando em ].' }); }
+});
 
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
