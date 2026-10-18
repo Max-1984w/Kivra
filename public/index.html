@@ -216,7 +216,7 @@ async function vEnd(){
 }
 async function vMeus(){
  const o=await api('/api/meus-pedidos');
- app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.tem_end&&x.status=='aprovado'?` <span class="tag">🚚 ${ETAPAS_ROT[x.entrega_etapa]||'Aguardando envio'}</span>`:''}<br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.tem_end&&x.status=='aprovado'?bt('acompanhar','🚚 Acompanhar entrega',`data-id="${x.id}" data-t="${esc(x.item)}"`,'p'):''}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}${MP_ATIVO&&x.mp&&x.status=='pendente'&&x.preco>0?bt('pagarmp','Pagar com Mercado Pago',`data-id="${x.id}"`,'p'):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
+ app.innerHTML='<h3>Meus pedidos</h3>'+(o.length?o.map(x=>`<div class="box"><b>#${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}${x.frete_valor>0?` <span class="mut">(com frete ${brl(x.frete_valor)})</span>`:''}<br><span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.tem_end&&x.status=='aprovado'?` <span class="tag">🚚 ${ETAPAS_ROT[x.entrega_etapa]||'Aguardando envio'}</span>`:''}<br><span class="mut">${esc(x.loja_nome||'')} · ${dt(x.criado)}</span><div class="row" style="margin-top:8px">${bt('chat','💬 Conversar',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.tem_end&&x.status=='aprovado'?bt('acompanhar','🚚 Acompanhar entrega',`data-id="${x.id}" data-t="${esc(x.item)}"`,'p'):''}${x.metodo=='pix'&&x.status=='pendente'?bt('compmodal',x.tem_comp?'Reenviar comprovante':'Enviar comprovante',`data-id="${x.id}"`):''}${MP_ATIVO&&x.mp&&x.status=='pendente'&&x.preco>0?bt('pagarmp','Pagar com Mercado Pago',`data-id="${x.id}"`,'p'):''}</div></div>`).join(''):'<p class="mut">Você ainda não fez pedidos.</p>');
 }
 async function cepPronto(semVia){
  const cep=digits(val('f_cep'));if(cep.length!=8||!cur||!cur.it)return;
@@ -236,9 +236,9 @@ function pedido(it,ends=[]){
 function fin(r,it,m){
  cur.pid=r.id;
  const mp=MP_ATIVO&&r.mp&&r.total>0?`<div class="box"><b>Pagar agora pelo Mercado Pago</b><p class="mut">Pix, cartão de crédito ou débito. O pedido é aprovado automaticamente quando o pagamento for confirmado.</p>${bt('pagarmp','Pagar com Mercado Pago',`data-id="${r.id}"`,'p')}</div><p class="mut">Ou, se preferir, combine direto com o vendedor:</p>`:`<p class="mut">ℹ️ O pagamento pelo Mercado Pago ainda não está funcionando. Use uma das opções abaixo.</p>`;
- const pg=m=='pix'?(r.pix?`<div class="box"><div class="mut">Chave Pix do vendedor</div><div style="font-size:18px;font-weight:700;word-break:break-all;margin:6px 0">${esc(r.pix)}</div>${bt('copiarpix','Copiar chave',`data-l="${esc(r.pix)}"`,'p')}</div><label>Depois de pagar, anexe a foto do comprovante</label><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div>${bt('comp','Enviar comprovante',`data-id="${r.id}"`,'p')}`:'<div class="box">O vendedor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</div>')
+ const pg=m=='pix'?(r.pix?`<div class="box"><div class="mut">Pague <b>${brl(r.total)}</b>${r.frete>0?' (produto + frete)':''} na chave Pix do vendedor</div><div style="font-size:18px;font-weight:700;word-break:break-all;margin:6px 0">${esc(r.pix)}</div>${bt('copiarpix','Copiar chave',`data-l="${esc(r.pix)}"`,'p')}</div><label>Depois de pagar, anexe a foto do comprovante</label><input id="cp" type="file" accept="image/*"><div class="err" id="er"></div>${bt('comp','Enviar comprovante',`data-id="${r.id}"`,'p')}`:'<div class="box">O vendedor ainda não cadastrou a chave Pix. Fale com ele pelo chat.</div>')
   :`<div class="box"><b>Pagamento no cartão de ${m=='credito'?'crédito':'débito'}</b><p>Entre em contato com o vendedor para acertar o pagamento. Quando vocês combinarem, ele aprova o seu pedido.</p></div>`;
- $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><p>Total: <b>${brl(r.total)}</b></p>${mp}${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
+ $('#mod').innerHTML=`<div class="modal"><div><h3 style="margin-top:0">Pedido #${r.id} criado ✅</h3><div class="box">${[['Produto',r.produto],...(r.desconto>0?[['Desconto (cupom ou vale)',-r.desconto]]:[]),...(r.frete>0?[['Frete '+(r.frete_servico||'')+(r.frete_prazo?' · '+r.frete_prazo+' dias úteis':''),r.frete]]:[])].map(([n,v])=>`<div class="row" style="justify-content:space-between"><span>${esc(n)}</span><span style="text-align:right">${v<0?'− '+brl(-v):brl(v)}</span></div>`).join('')}<hr style="border:0;border-top:1px solid var(--bd)"><div class="row" style="justify-content:space-between"><b>Total a pagar</b><b style="text-align:right">${brl(r.total)}</b></div></div>${mp}${pg}<div class="row" style="margin-top:12px">${bt('chat','💬 Conversar com o vendedor',`data-id="${r.id}" data-t="${esc(it.nome)}"`,'p')}</div>${it.vale?'<p>Assim que o vendedor aprovar o pagamento, o código do vale chega no chat. Use o código no campo "Código do vale presente" ao comprar nesta loja.</p>':''}<p class="mut">Acompanhe em "Meus pedidos".</p>${bt('fechar','Fechar')}</div></div>`;
 }
 async function chat(url,tit,pre){
  clearInterval(ct);
@@ -252,335 +252,319 @@ async function chat(url,tit,pre){
 
 const POL=`# POLÍTICA DE PRIVACIDADE — KIVRA
 
-**Última atualização: 06/10/2026**
+**Última atualização: 18/10/2026**
+**Versão: 1.2**
 
-A **Kivra**, mantida por **Jose de Andrade Lima Junior**, CPF **040.716.902-40**, é uma plataforma destinada à criação, gerenciamento e utilização de lojas virtuais, permitindo que lojistas disponibilizem produtos e serviços para venda pela internet.
+## 1. INTRODUÇÃO
 
-Esta Política de Privacidade explica como a Kivra coleta, utiliza, armazena, compartilha e protege dados pessoais de usuários, compradores e lojistas.
+A Kivra é uma plataforma digital que permite a criação, administração e utilização de lojas virtuais para a comercialização de produtos e serviços pela internet.
 
-A Kivra busca realizar o tratamento de dados pessoais em conformidade com a **Lei nº 13.709/2018 — Lei Geral de Proteção de Dados Pessoais (LGPD)**, o **Marco Civil da Internet**, a legislação de proteção ao consumidor e demais normas aplicáveis.
+Esta Política de Privacidade explica como os dados pessoais dos usuários, lojistas e compradores são coletados, utilizados, armazenados, compartilhados e protegidos durante a utilização da plataforma.
 
-## 1. IDENTIFICAÇÃO DO RESPONSÁVEL
+A Kivra busca tratar os dados pessoais em conformidade com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais — LGPD), o Marco Civil da Internet, o Código de Defesa do Consumidor e demais normas aplicáveis.
+
+## 2. IDENTIFICAÇÃO DO RESPONSÁVEL
+
+**Nome da plataforma:** Kivra
+**Responsável:** Jose de Andrade Lima Junior
+**CPF:** 040.716.902-40
+**CNPJ:** A plataforma não possui CNPJ atualmente.
+**E-mail para contato:** kivra.plataforma.de.vendas@gmail.com
+
+A Kivra poderá atuar como controladora dos dados pessoais nas atividades em que determinar as finalidades e os meios do tratamento.
+
+Nas atividades realizadas em nome dos lojistas, a Kivra poderá atuar como operadora, conforme as circunstâncias e as responsabilidades efetivamente assumidas.
+
+Os lojistas também poderão atuar como controladores dos dados pessoais de seus clientes, especialmente quando utilizarem essas informações para administrar vendas, organizar entregas e cumprir suas próprias obrigações.
+
+A definição das responsabilidades dependerá das atividades efetivamente realizadas por cada parte.
+
+## 3. DADOS PESSOAIS COLETADOS
+
+A Kivra coleta ou poderá tratar dados necessários ao cadastro, funcionamento das lojas, realização de compras, processamento de pagamentos, entregas e segurança da plataforma.
+
+### 3.1. Dados dos lojistas
+
+Para cadastrar e administrar uma loja, poderão ser tratados:
+
+* Nome do responsável pela conta;
+* Nome da loja;
+* Endereço da loja;
+* E-mail;
+* Número de telefone, quando solicitado;
+* CPF ou CNPJ, quando necessário;
+* Informações sobre produtos e serviços comercializados;
+* Dados necessários ao acesso e à segurança da conta;
+* Informações necessárias para administrar a loja.
+
+### 3.2. Dados dos compradores
+
+Para permitir a realização de compras e a entrega de produtos, poderão ser tratados:
+
+* Nome completo;
+* Endereço de entrega;
+* E-mail;
+* Número de telefone, quando necessário;
+* Produtos adquiridos;
+* Valor e data da compra;
+* Identificadores do pedido;
+* Informações sobre o andamento do pedido;
+* Informações relacionadas ao pagamento.
+
+### 3.3. Dados de pagamento
+
+Como a Kivra possui integração com o Mercado Pago, poderão ser tratados dados necessários para identificar e acompanhar as transações, incluindo:
+
+* Valor da compra;
+* Identificador da transação;
+* Identificador do pedido;
+* Data e horário da operação;
+* Situação do pagamento;
+* Informações sobre cancelamentos e reembolsos, quando aplicáveis.
+
+Os dados efetivamente recebidos dependerão da modalidade de integração implementada.
+
+### 3.4. Dados técnicos
+
+Durante a utilização da plataforma, poderão ser tratados:
+
+* Endereço IP;
+* Data e horário dos acessos;
+* Tipo de dispositivo;
+* Sistema operacional;
+* Navegador utilizado;
+* Registros de acesso;
+* Informações necessárias à segurança e à prevenção de fraudes.
+
+## 4. FINALIDADES DO TRATAMENTO
+
+Os dados pessoais poderão ser utilizados para:
+
+* Criar e administrar contas;
+* Permitir o funcionamento das lojas virtuais;
+* Identificar lojistas e compradores;
+* Processar pedidos;
+* Viabilizar pagamentos;
+* Confirmar o estado das transações;
+* Organizar e viabilizar entregas;
+* Permitir o contato entre compradores e lojistas;
+* Prestar suporte;
+* Prevenir fraudes;
+* Proteger a plataforma;
+* Cumprir obrigações legais;
+* Exercer direitos em procedimentos judiciais, administrativos ou arbitrais;
+* Melhorar o funcionamento dos serviços;
+* Enviar comunicações relacionadas às contas e aos pedidos.
+
+Os dados não serão utilizados para finalidades incompatíveis com aquelas informadas ao titular.
+
+## 5. BASES LEGAIS
+
+O tratamento dos dados pessoais será fundamentado nas hipóteses previstas na LGPD, conforme a finalidade de cada operação.
+
+Entre as possíveis bases legais estão:
+
+* Execução de contrato ou de procedimentos preliminares;
+* Cumprimento de obrigação legal ou regulatória;
+* Exercício regular de direitos;
+* Legítimo interesse, quando aplicável e respeitados os direitos dos titulares;
+* Consentimento, quando necessário;
+* Proteção do crédito, quando aplicável;
+* Outras hipóteses previstas na legislação.
+
+A base legal utilizada dependerá da finalidade e das circunstâncias específicas do tratamento.
+
+## 6. PAGAMENTOS POR MEIO DO MERCADO PAGO
+
+A Kivra utiliza integração com o Mercado Pago para permitir que os compradores realizem pagamentos pelas compras efetuadas nas lojas virtuais.
+
+### 6.1. Processamento dos pagamentos
+
+Os pagamentos são processados por meio da integração com o Mercado Pago.
+
+O valor da venda é direcionado à conta do respectivo lojista, conforme a configuração do sistema de pagamentos.
+
+A Kivra não recebe os valores das vendas em sua própria conta como parte do fluxo de pagamento descrito nesta Política.
+
+### 6.2. Dados compartilhados
+
+Para viabilizar as transações, poderão ser transmitidas ao Mercado Pago as informações necessárias ao processamento do pagamento, como identificadores de pedidos, valores e outros dados exigidos pela integração.
+
+O Mercado Pago poderá tratar dados adicionais necessários à autenticação, prevenção de fraudes, análise de transações e cumprimento de obrigações legais ou regulatórias.
+
+### 6.3. Dados financeiros
+
+A Kivra poderá receber informações sobre o resultado das transações, como confirmação, recusa, cancelamento ou reembolso, quando disponibilizadas pelo Mercado Pago.
+
+A Kivra não declara armazenar dados completos de cartões bancários. O tratamento dessas informações dependerá da implementação técnica da integração e dos serviços utilizados.
+
+O Mercado Pago poderá tratar determinados dados sob sua própria responsabilidade, conforme seus termos e sua política de privacidade.
+
+## 7. ENDEREÇOS DAS LOJAS E DOS COMPRADORES
+
+A Kivra coleta endereços de lojas e compradores para permitir o funcionamento das lojas virtuais e a realização das entregas.
+
+### 7.1. Endereço das lojas
+
+O endereço informado pelos lojistas poderá ser utilizado para administração da loja, identificação comercial interna e outras finalidades necessárias ao funcionamento da plataforma.
+
+O endereço não é disponibilizado publicamente pela Kivra como parte da funcionalidade descrita nesta Política.
+
+### 7.2. Endereço dos compradores
+
+O endereço de entrega fornecido pelo comprador será utilizado para viabilizar o envio dos produtos adquiridos.
+
+Esse endereço poderá ser acessado pelo lojista responsável pelo pedido e pelos serviços de entrega envolvidos na operação, na medida necessária para preparar, despachar e entregar a encomenda.
+
+Os endereços não são exibidos publicamente aos visitantes da plataforma.
+
+### 7.3. Proteção dos endereços
+
+A Kivra buscará limitar o acesso aos endereços às pessoas e aos serviços que necessitem dessas informações para cumprir suas respectivas funções.
+
+Os lojistas deverão utilizar os endereços dos compradores para finalidades legítimas relacionadas à venda e à entrega, respeitando a legislação aplicável.
+
+## 8. ARMAZENAMENTO DE DADOS PELO SUPABASE
+
+A Kivra utiliza serviços do Supabase como parte de sua infraestrutura tecnológica e de armazenamento de dados.
+
+Determinadas informações relacionadas a contas, lojas, compradores e pedidos poderão ser armazenadas na infraestrutura utilizada pela plataforma, conforme a implementação do sistema.
+
+O Supabase poderá tratar dados pessoais na medida necessária para fornecer seus serviços de infraestrutura, banco de dados e armazenamento.
+
+A Kivra buscará configurar seus sistemas e controles de acesso para restringir o acesso aos dados às pessoas e aos processos que necessitem dessas informações.
+
+O uso de serviços de terceiros não elimina as responsabilidades da Kivra e dos lojistas pelo tratamento de dados pessoais que realizarem.
+
+Quando aplicável, o tratamento realizado por fornecedores estará sujeito às condições contratuais e às obrigações legais pertinentes.
+
+## 9. COMPARTILHAMENTO DE DADOS
+
+Os dados pessoais poderão ser compartilhados, quando necessário, com:
+
+* Lojistas responsáveis pelas vendas;
+* Mercado Pago, para processamento e acompanhamento dos pagamentos;
+* Serviços de entrega e logística;
+* Supabase, para os serviços de infraestrutura utilizados pela plataforma;
+* Outros fornecedores tecnológicos necessários ao funcionamento da Kivra;
+* Autoridades públicas, quando houver obrigação legal ou determinação válida.
+
+O compartilhamento será limitado aos dados necessários para a finalidade correspondente.
+
+A Kivra não comercializa dados pessoais como produto.
+
+## 10. ARMAZENAMENTO E RETENÇÃO
+
+Os dados pessoais serão mantidos pelo período necessário para cumprir as finalidades para as quais foram coletados.
+
+Algumas informações poderão ser mantidas após o encerramento da conta ou a conclusão de uma compra quando isso for necessário para:
+
+* Cumprir obrigações legais ou regulatórias;
+* Manter registros de transações;
+* Resolver disputas;
+* Exercer direitos;
+* Prevenir fraudes;
+* Proteger a segurança da plataforma.
+
+Quando não houver fundamento legal para a manutenção dos dados, eles poderão ser eliminados ou anonimizados, conforme permitido pela legislação.
+
+## 11. SEGURANÇA DOS DADOS
+
+A Kivra buscará adotar medidas técnicas e administrativas adequadas para proteger os dados pessoais contra acessos não autorizados, perda, destruição, alteração ou divulgação indevida.
+
+Essas medidas poderão incluir:
+
+* Controle de acesso;
+* Autenticação;
+* Restrição de permissões;
+* Proteção da infraestrutura;
+* Backups;
+* Monitoramento de eventos de segurança;
+* Outras medidas compatíveis com a natureza dos dados tratados.
+
+A utilização de fornecedores de infraestrutura não elimina a necessidade de configurar corretamente permissões, autenticação, políticas de acesso e demais mecanismos de segurança.
+
+Nenhum sistema conectado à internet é completamente imune a incidentes.
+
+Caso ocorra um incidente de segurança que possa acarretar risco ou dano relevante aos titulares, serão adotadas as providências exigidas pela legislação e pelas normas aplicáveis.
+
+## 12. DIREITOS DOS TITULARES
+
+Nos termos da LGPD, os titulares poderão exercer os direitos aplicáveis ao tratamento de seus dados, incluindo:
+
+* Confirmar a existência de tratamento;
+* Solicitar acesso aos dados;
+* Solicitar correção de dados incompletos, inexatos ou desatualizados;
+* Solicitar anonimização, bloqueio ou eliminação de dados tratados irregularmente;
+* Obter informações sobre compartilhamentos;
+* Solicitar portabilidade, quando aplicável;
+* Revogar consentimento, quando essa for a base legal utilizada;
+* Solicitar eliminação de dados tratados com base no consentimento, ressalvadas as hipóteses legais de conservação;
+* Opor-se a tratamentos quando cabível;
+* Solicitar revisão de decisões tomadas exclusivamente com base em tratamento automatizado, quando aplicável.
+
+O exercício desses direitos estará sujeito às condições e exceções previstas na legislação.
+
+## 13. COMO EXERCER SEUS DIREITOS
+
+Para solicitar informações ou exercer direitos relacionados aos dados pessoais, entre em contato pelo e-mail:
+
+**kivra.plataforma.de.vendas@gmail.com**
+
+Para proteger a privacidade dos usuários, poderão ser solicitadas informações razoáveis para confirmar a identidade do solicitante.
+
+Quando os dados forem tratados por um lojista para finalidades próprias, a solicitação poderá precisar ser direcionada também ao respectivo lojista.
+
+## 14. CRIANÇAS E ADOLESCENTES
+
+A Kivra buscará observar as normas de proteção de crianças e adolescentes e o princípio do melhor interesse.
+
+O tratamento de dados pessoais desse público será realizado conforme a legislação aplicável, incluindo as exigências específicas para dados de crianças quando cabíveis.
+
+## 15. SERVIÇOS DE TERCEIROS
+
+A Kivra utiliza serviços de terceiros necessários à sua operação, incluindo o Mercado Pago para pagamentos e o Supabase para infraestrutura tecnológica.
+
+Esses fornecedores poderão tratar dados pessoais na medida necessária à prestação dos serviços correspondentes.
+
+O tratamento realizado diretamente por terceiros para finalidades próprias também estará sujeito às respectivas políticas e condições de privacidade.
+
+## 16. TRANSFERÊNCIA INTERNACIONAL
+
+Alguns fornecedores tecnológicos poderão armazenar ou tratar dados pessoais fora do Brasil.
+
+Quando houver transferência internacional de dados, a Kivra deverá observar os requisitos da LGPD e as normas aplicáveis da Autoridade Nacional de Proteção de Dados.
+
+## 17. ALTERAÇÕES DESTA POLÍTICA
+
+Esta Política poderá ser atualizada para refletir mudanças na legislação, nas funcionalidades da Kivra, nos serviços de pagamento ou nas práticas de tratamento de dados.
+
+A versão mais recente ficará disponível na plataforma.
+
+Quando necessário, os usuários serão informados sobre alterações relevantes por meios adequados.
+
+## 18. LEGISLAÇÃO APLICÁVEL
+
+Esta Política será interpretada de acordo com a legislação brasileira, especialmente:
+
+* Lei nº 13.709/2018 — Lei Geral de Proteção de Dados Pessoais;
+* Lei nº 12.965/2014 — Marco Civil da Internet;
+* Lei nº 8.078/1990 — Código de Defesa do Consumidor;
+* Demais normas aplicáveis à proteção de dados e ao comércio eletrônico.
+
+## 19. CONTATO
+
+Para dúvidas, solicitações ou assuntos relacionados à privacidade e proteção de dados:
 
 **Plataforma:** Kivra
 **Responsável:** Jose de Andrade Lima Junior
 **CPF:** 040.716.902-40
 **E-mail:** kivra.plataforma.de.vendas@gmail.com
 
-A Kivra é atualmente mantida por pessoa física e não possui CNPJ.
-
-Para determinadas atividades, a Kivra poderá atuar como **controladora** dos dados pessoais. Em outras atividades, especialmente quando processar dados em nome de um lojista, poderá atuar como **operadora**, conforme a finalidade e as circunstâncias do tratamento.
-
-## 2. QUAIS DADOS PODEM SER COLETADOS
-
-Dependendo da utilização da plataforma, a Kivra poderá tratar:
-
-### 2.1. Dados de cadastro
-
-* Nome;
-* E-mail;
-* Número de telefone;
-* CPF, quando necessário;
-* Data de nascimento, quando necessária;
-* Endereço;
-* Dados necessários para criação e segurança da conta;
-* Informações fornecidas voluntariamente pelo usuário.
-
-### 2.2. Dados dos lojistas
-
-Para criação e administração de uma loja, poderão ser solicitados:
-
-* Nome do responsável;
-* CPF ou CNPJ, quando aplicável;
-* Nome da loja;
-* E-mail;
-* Telefone;
-* Endereço;
-* Informações sobre produtos e serviços;
-* Informações necessárias para recebimentos;
-* Dados necessários para gerenciamento da loja.
-
-### 2.3. Dados de compradores
-
-Durante uma compra, poderão ser tratados:
-
-* Nome;
-* E-mail;
-* Telefone;
-* Endereço de entrega;
-* Produtos adquiridos;
-* Valor da compra;
-* Data e horário do pedido;
-* Informações necessárias para processamento e acompanhamento do pedido;
-* Informações relacionadas ao pagamento.
-
-### 2.4. Dados técnicos
-
-A plataforma poderá registrar informações técnicas, como:
-
-* Endereço IP;
-* Data e horário de acesso;
-* Dispositivo utilizado;
-* Sistema operacional;
-* Navegador ou aplicativo;
-* Registros de acesso;
-* Informações relacionadas à segurança;
-* Identificadores técnicos necessários ao funcionamento da plataforma.
-
-## 3. FINALIDADES DO TRATAMENTO
-
-Os dados pessoais poderão ser utilizados para:
-
-* Criar e administrar contas;
-* Permitir o funcionamento das lojas;
-* Processar pedidos;
-* Permitir a comunicação entre compradores e lojistas;
-* Auxiliar no processamento de pagamentos;
-* Permitir entregas;
-* Prestar suporte;
-* Manter e melhorar a plataforma;
-* Garantir a segurança;
-* Detectar e prevenir fraudes;
-* Identificar atividades suspeitas;
-* Cumprir obrigações legais;
-* Exercer direitos em processos judiciais, administrativos ou arbitrais;
-* Enviar comunicações relacionadas ao funcionamento da plataforma;
-* Enviar comunicações promocionais quando houver base legal adequada;
-* Realizar análises estatísticas e melhorias no serviço.
-
-Os dados não serão tratados para finalidades incompatíveis com aquelas informadas ao titular.
-
-## 4. BASES LEGAIS
-
-O tratamento de dados pessoais poderá ocorrer com fundamento nas hipóteses previstas na LGPD, incluindo, conforme o caso:
-
-* Execução de contrato;
-* Cumprimento de obrigação legal ou regulatória;
-* Exercício regular de direitos;
-* Legítimo interesse;
-* Consentimento;
-* Proteção do crédito, quando aplicável;
-* Outras hipóteses previstas na legislação.
-
-Quando o tratamento depender de consentimento, este deverá ser obtido de forma livre, informada e inequívoca.
-
-## 5. DADOS DOS CLIENTES DAS LOJAS
-
-A Kivra funciona como plataforma para diferentes lojas.
-
-Quando um comprador realizar uma compra em determinada loja, os dados necessários para processamento e cumprimento do pedido poderão ser disponibilizados ao respectivo lojista.
-
-O lojista poderá ser responsável pelo tratamento dos dados que receber e utilizar para suas próprias finalidades, devendo observar a legislação aplicável.
-
-A Kivra poderá estabelecer regras específicas para que os lojistas utilizem os dados de seus clientes de maneira adequada e segura.
-
-## 6. COMPARTILHAMENTO DE DADOS
-
-Os dados poderão ser compartilhados, quando necessário, com:
-
-* Lojistas responsáveis pelas lojas;
-* Processadores e intermediadores de pagamento;
-* Empresas de logística e entrega;
-* Provedores de hospedagem;
-* Serviços de armazenamento;
-* Serviços de infraestrutura tecnológica;
-* Serviços de segurança;
-* Serviços necessários para comunicação;
-* Prestadores necessários à operação da plataforma;
-* Autoridades públicas quando houver obrigação legal ou determinação válida.
-
-O compartilhamento será limitado ao necessário para a finalidade correspondente.
-
-A Kivra **não comercializa dados pessoais como produto**.
-
-## 7. PAGAMENTOS
-
-Os pagamentos poderão ser realizados por meio de instituições financeiras, gateways, adquirentes ou outros intermediadores especializados.
-
-Quando terceiros forem responsáveis pelo processamento do pagamento, os dados necessários para a realização da transação poderão ser enviados a esses terceiros.
-
-A Kivra não solicita senhas bancárias dos usuários.
-
-Quando o pagamento for processado diretamente por um terceiro, a Kivra poderá não ter acesso aos dados completos do cartão utilizado na transação.
-
-## 8. COOKIES
-
-A Kivra poderá utilizar cookies e tecnologias semelhantes para:
-
-* Manter sessões de usuários;
-* Permitir o funcionamento da plataforma;
-* Armazenar preferências;
-* Melhorar desempenho;
-* Reforçar a segurança;
-* Produzir estatísticas;
-* Personalizar determinadas funcionalidades, quando aplicável.
-
-Cookies estritamente necessários poderão ser utilizados para o funcionamento da plataforma.
-
-Quando determinado cookie depender de consentimento, o usuário poderá gerenciar suas preferências por meio dos mecanismos disponibilizados pela Kivra.
-
-## 9. SEGURANÇA DOS DADOS
-
-A Kivra adotará medidas técnicas e administrativas razoáveis para proteger os dados pessoais contra:
-
-* Acessos não autorizados;
-* Perda;
-* Destruição;
-* Alteração;
-* Divulgação indevida;
-* Tratamento inadequado ou ilícito.
-
-As medidas poderão incluir controle de acesso, autenticação, proteção da infraestrutura, backups, monitoramento e outras medidas de segurança compatíveis com a natureza dos dados tratados.
-
-Apesar das medidas adotadas, nenhum sistema conectado à internet pode ser considerado completamente seguro.
-
-Caso ocorra um incidente de segurança que possa acarretar risco ou dano relevante aos titulares, serão adotadas as providências exigidas pela legislação e pelas normas aplicáveis.
-
-## 10. ARMAZENAMENTO E RETENÇÃO
-
-Os dados pessoais serão mantidos pelo período necessário para cumprir as finalidades para as quais foram coletados.
-
-Após o encerramento da conta ou da relação com o usuário, determinados dados poderão permanecer armazenados quando isso for necessário para:
-
-* Cumprimento de obrigação legal ou regulatória;
-* Exercício regular de direitos;
-* Cumprimento de obrigações contratuais;
-* Prevenção de fraudes;
-* Segurança da plataforma;
-* Outras hipóteses permitidas pela legislação.
-
-Quando não houver fundamento legal para a manutenção dos dados, eles poderão ser eliminados, anonimizados ou submetidos a outra forma de tratamento permitida pela legislação.
-
-## 11. DIREITOS DOS TITULARES
-
-Nos termos da LGPD, o titular poderá exercer seus direitos, observadas as condições e exceções previstas em lei.
-
-Entre esses direitos estão:
-
-* Confirmar a existência de tratamento;
-* Solicitar acesso aos seus dados;
-* Solicitar correção de dados incompletos, inexatos ou desatualizados;
-* Solicitar anonimização, bloqueio ou eliminação de dados tratados de forma desnecessária ou irregular;
-* Solicitar informações sobre compartilhamento;
-* Solicitar informações sobre a finalidade do tratamento;
-* Revogar consentimentos anteriormente fornecidos, quando aplicável;
-* Solicitar eliminação de dados tratados com base no consentimento, ressalvadas as hipóteses legais de conservação;
-* Solicitar portabilidade, quando aplicável e regulamentada;
-* Opor-se a determinados tratamentos quando cabível;
-* Solicitar revisão de decisões tomadas exclusivamente com base em tratamento automatizado, quando aplicável.
-
-## 12. COMO SOLICITAR SEUS DIREITOS
-
-Solicitações relacionadas aos dados pessoais poderão ser realizadas pelo seguinte canal:
-
-**E-mail:** kivra.plataforma.de.vendas@gmail.com
-
-Para proteger os dados dos usuários, a Kivra poderá solicitar informações razoáveis para confirmar a identidade do solicitante antes de atender determinadas solicitações.
-
-As solicitações serão analisadas conforme a LGPD e demais normas aplicáveis.
-
-O exercício dos direitos do titular não deverá ser cobrado quando a legislação determinar que o procedimento seja gratuito.
-
-## 13. ENCARREGADO PELO TRATAMENTO DE DADOS
-
-O canal disponibilizado pela Kivra para assuntos relacionados à privacidade e proteção de dados é:
-
-**E-mail:** kivra.plataforma.de.vendas@gmail.com
-
-Caso seja aplicável a nomeação formal de encarregado de proteção de dados, a identificação e os dados de contato correspondentes poderão ser disponibilizados por meio deste canal ou em atualização desta Política.
-
-A legislação e as normas da ANPD podem estabelecer tratamento diferenciado para determinados agentes de pequeno porte que atendam aos requisitos aplicáveis.
-
-## 14. CRIANÇAS E ADOLESCENTES
-
-A Kivra busca proteger crianças e adolescentes e observar o princípio do melhor interesse no tratamento de seus dados pessoais.
-
-Quando houver tratamento de dados de crianças, serão observadas as exigências específicas previstas na LGPD e demais normas aplicáveis, inclusive aquelas relacionadas ao consentimento de pais ou responsáveis quando exigido.
-
-A Kivra poderá adotar medidas para evitar a coleta desnecessária de dados de crianças e adolescentes.
-
-## 15. COMUNICAÇÕES
-
-A Kivra poderá enviar mensagens necessárias para:
-
-* Confirmação de cadastro;
-* Segurança da conta;
-* Alteração de senha;
-* Confirmação de pedidos;
-* Atualizações de pedidos;
-* Atendimento;
-* Informações importantes sobre a plataforma;
-* Outras comunicações necessárias à prestação do serviço.
-
-Comunicações promocionais serão realizadas somente quando houver fundamento legal adequado.
-
-Quando aplicável, o usuário poderá solicitar o cancelamento de comunicações promocionais.
-
-O cancelamento de mensagens promocionais não impedirá o envio de comunicações necessárias ao funcionamento da conta ou à execução de serviços contratados.
-
-## 16. RESPONSABILIDADES DOS LOJISTAS
-
-Os lojistas que utilizam a Kivra são responsáveis pelas operações de tratamento que realizarem diretamente com os dados de seus clientes.
-
-Os lojistas deverão:
-
-* Utilizar os dados somente para finalidades legítimas;
-* Respeitar os direitos dos titulares;
-* Manter os dados protegidos;
-* Evitar acesso não autorizado;
-* Não utilizar dados para finalidades incompatíveis com a finalidade da compra;
-* Cumprir a legislação aplicável.
-
-A Kivra poderá adotar medidas administrativas ou técnicas para proteger os usuários e a plataforma caso identifique utilização inadequada dos dados.
-
-## 17. SERVIÇOS DE TERCEIROS
-
-A Kivra poderá utilizar fornecedores especializados para hospedagem, armazenamento, pagamentos, segurança, comunicação, análise, logística e outras atividades necessárias ao funcionamento da plataforma.
-
-Esses fornecedores poderão tratar dados pessoais somente na medida necessária para a prestação dos serviços correspondentes e conforme as obrigações legais e contratuais aplicáveis.
-
-## 18. TRANSFERÊNCIA INTERNACIONAL
-
-Determinados fornecedores tecnológicos utilizados pela Kivra poderão realizar tratamento ou armazenamento de dados fora do Brasil.
-
-Quando ocorrer transferência internacional de dados pessoais, a Kivra buscará observar os requisitos estabelecidos pela LGPD e pelas normas da ANPD aplicáveis à transferência internacional.
-
-## 19. ALTERAÇÕES DESTA POLÍTICA
-
-Esta Política de Privacidade poderá ser atualizada para refletir:
-
-* Mudanças na legislação;
-* Alterações nas funcionalidades da Kivra;
-* Novos serviços;
-* Alterações nas práticas de tratamento de dados;
-* Mudanças nos fornecedores utilizados.
-
-A versão mais recente estará disponível na plataforma.
-
-Quando uma alteração exigir comunicação específica ao usuário, a Kivra poderá utilizar os canais de comunicação disponíveis.
-
-## 20. LEGISLAÇÃO APLICÁVEL
-
-Esta Política será interpretada de acordo com a legislação brasileira, especialmente:
-
-* Lei nº 13.709/2018 — Lei Geral de Proteção de Dados Pessoais (LGPD);
-* Lei nº 12.965/2014 — Marco Civil da Internet;
-* Lei nº 8.078/1990 — Código de Defesa do Consumidor;
-* Demais normas aplicáveis às atividades realizadas pela plataforma.
-
-## 21. CONTATO
-
-Para dúvidas, solicitações ou assuntos relacionados à privacidade e proteção de dados:
-
-**Kivra**
-**Responsável:** Jose de Andrade Lima Junior
-**CPF:** 040.716.902-40
-**E-mail:** kivra.plataforma.de.vendas@gmail.com
-
 ---
 
-**Última atualização:** 06/10/2026
-**Versão:** 1.0
+**Versão:** 1.2
+**Última atualização:** 18/10/2026
 `;
 function md(t){
  const il=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/([\w.+-]+@[\w-]+\.[\w.]+)/g,'<a href="mailto:$1">$1</a>');
@@ -643,7 +627,7 @@ function tAvi(){
 }
 async function tPed(){
  const o=await api('/api/vendedor/pedidos?ordem='+ord);
- $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.frete_servico?`<p class="mut" style="margin:4px 0 0">📦 Frete ${esc(x.frete_servico)}: ${brl(x.frete_valor)}${x.frete_prazo?' · '+x.frete_prazo+' dias úteis':''}</p>`:''}${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}${x.status=='aprovado'&&x.rua?`<div class="box" style="margin:10px 0"><b>🚚 Entrega</b> <span class="tag">${ETAPAS_ROT[x.entrega_etapa]||'Ainda não atualizada'}</span><div class="row" style="margin-top:6px"><select id="et${x.id}">${Object.entries(ETAPAS_ROT).map(([k,n])=>`<option value="${k}" ${x.entrega_etapa==k?'selected':''}>${n}</option>`).join('')}</select><input id="rt${x.id}" placeholder="Código de rastreio (se tiver)" value="${esc(x.rastreio||'')}"></div>${bt('entrega','Atualizar entrega',`data-id="${x.id}"`,'p')}</div>`:''}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
+ $('#tb').innerHTML=`<label>Ordenar</label><select id="od" style="max-width:220px"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option></select>`+(o.length?o.map(x=>`<div class="box"><b>🔔 #${x.id} · ${esc(x.item)}</b> · ${brl(x.preco)}${x.frete_valor>0?` <span class="mut">(inclui frete ${brl(x.frete_valor)})</span>`:''} <span class="tag">${MET[x.metodo]||x.metodo}</span> <span class="tag">${ST[x.status]||x.status}</span>${x.cupom?` <span class="tag">cupom ${esc(x.cupom)}</span>`:''}<br><span class="mut">${dt(x.criado)}</span><p style="margin:8px 0 0"><b>${esc(x.nome)}</b> · ${esc(x.telefone)}${x.rua?`<br>${esc(x.rua)}, ${esc(x.numero)} — ${esc(x.bairro)}, ${esc(x.cidade)}${x.estado?'/'+esc(x.estado):''} · CEP ${esc(x.cep)}`:'<br><span class="mut">Vale presente — sem endereço de entrega</span>'}</p>${x.frete_servico?`<p class="mut" style="margin:4px 0 0">📦 Frete ${esc(x.frete_servico)}: ${brl(x.frete_valor)}${x.frete_prazo?' · '+x.frete_prazo+' dias úteis':''}</p>`:''}${x.comprovante?`<img src="${x.comprovante}" style="width:90px;border-radius:8px;margin-top:8px;cursor:pointer" data-x="zoom">`:(x.metodo=='pix'?'<p class="mut">Comprovante do Pix ainda não enviado.</p>':'')}${x.status=='aprovado'&&x.rua?`<div class="box" style="margin:10px 0"><b>🚚 Entrega</b> <span class="tag">${ETAPAS_ROT[x.entrega_etapa]||'Ainda não atualizada'}</span><div class="row" style="margin-top:6px"><select id="et${x.id}">${Object.entries(ETAPAS_ROT).map(([k,n])=>`<option value="${k}" ${x.entrega_etapa==k?'selected':''}>${n}</option>`).join('')}</select><input id="rt${x.id}" placeholder="Código de rastreio (se tiver)" value="${esc(x.rastreio||'')}"></div>${bt('entrega','Atualizar entrega',`data-id="${x.id}"`,'p')}</div>`:''}<div class="row" style="margin-top:8px">${bt('chat','💬 Chat',`data-id="${x.id}" data-t="${esc(x.item)}"`)}${x.status=='pendente'?bt('status','✅ Aprovar',`data-id="${x.id}" data-s="aprovado"`,'p')+bt('status','❌ Recusar',`data-id="${x.id}" data-s="recusado"`):''}</div></div>`).join(''):'<p class="mut">Nenhum pedido ainda.</p>');
  $('#od').value=ord;
 }
 async function tConv(){
@@ -764,6 +748,6 @@ document.addEventListener('click',async e=>{const t=e.target.closest('[data-x]')
  try{await A[t.dataset.x](t.dataset,t)}catch(err){const er=$('#er');er?er.textContent=err.message:alert(err.message)}});
 document.addEventListener('keydown',e=>{if(e.key=='Enter'&&e.target.id=='gq')A.busca();if(e.key=='Enter'&&e.target.id=='mt'){e.preventDefault();document.querySelector('[data-x=msg]')?.click()}});
 document.addEventListener('input',e=>{if(e.target.id=='co'||e.target.id=='ec'){const d=digits(e.target.value).slice(0,8);e.target.value=d.length>5?d.slice(0,5)+'-'+d.slice(5):d;if(d.length==8)viaCep(d,e.target.id=='co'?['lo_uf','lo_ci','lo_ba','lo_ru']:['eu2','ei','eb','er2'])}if(e.target.id=='f_cep'){const d=digits(e.target.value).slice(0,8);e.target.value=d.length>5?d.slice(0,5)+'-'+d.slice(5):d;if(d.length==8)cepPronto()}if(e.target.id=='pr'){const c=parseInt(digits(e.target.value)||'0',10);e.target.value='R$ '+(c/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}if(e.target.id=='pq'&&cidLista)cidLista(e.target.value)});
-document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}if(e.target.id=='f_ae'){const a=cur.ends.find(x=>String(x.id)==e.target.value);if(a){const u=UF.find(x=>x[0]==a.estado);cur.uf={sigla:u[0],nome:u[1]};$('#f_uf').value=`${u[1]} (${u[0]})`;$('#f_ci').value=a.cidade;$('#f_cep').value=a.cep.slice(0,5)+'-'+a.cep.slice(5);$('#f_ba').value=a.bairro;$('#f_ru').value=a.rua;$('#f_nu').value=a.numero;cepPronto(true)}}if(e.target.name=='fr'){cur.frete={id:e.target.dataset.id,valor:Number(e.target.dataset.v),servico:e.target.dataset.s};const t=$('#tot');if(t)t.textContent='Frete '+cur.frete.servico+': '+brl(cur.frete.valor)+' · Produto: '+brl(cur.it.preco)+' (cupons descontam só do produto)'}});
+document.addEventListener('change',e=>{if(e.target.id=='od'){ord=e.target.value;tPed()}if(e.target.id=='f_ae'){const a=cur.ends.find(x=>String(x.id)==e.target.value);if(a){const u=UF.find(x=>x[0]==a.estado);cur.uf={sigla:u[0],nome:u[1]};$('#f_uf').value=`${u[1]} (${u[0]})`;$('#f_ci').value=a.cidade;$('#f_cep').value=a.cep.slice(0,5)+'-'+a.cep.slice(5);$('#f_ba').value=a.bairro;$('#f_ru').value=a.rua;$('#f_nu').value=a.numero;cepPronto(true)}}if(e.target.name=='fr'){cur.frete={id:e.target.dataset.id,valor:Number(e.target.dataset.v),servico:e.target.dataset.s};const t=$('#tot');if(t)t.textContent='Produto '+brl(cur.it.preco)+' + frete '+cur.frete.servico+' '+brl(cur.frete.valor)+' = '+brl(cur.it.preco+cur.frete.valor)+' (cupom e vale descontam só do produto)'}});
 init();
 </script></body></html>

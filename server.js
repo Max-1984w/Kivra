@@ -330,10 +330,10 @@ app.post('/api/pedidos', logado, async (req, res) => {
   const dono = await get('SELECT usuario_id FROM lojas WHERE id=?', loja_id);
   await notificar(dono && dono.usuario_id, 'pedido', 'Novo pedido', `#${ped.id} · ${item}`, 'vend-ped');
   const l = await get('SELECT whatsapp,pix,(mp_access_token IS NOT NULL) AS mp FROM lojas WHERE id=?', loja_id);
-  res.json({ ok: true, id: ped.id, total: final, whatsapp: l.whatsapp, pix: l.pix, mp: !!l.mp && mpPronto() });
+  res.json({ ok: true, id: ped.id, total: final, produto: preco, desconto, frete: frete ? frete.valor : 0, frete_servico: frete ? frete.servico : null, frete_prazo: frete ? frete.prazo : null, whatsapp: l.whatsapp, pix: l.pix, mp: !!l.mp && mpPronto() });
 });
 app.get('/api/meus-pedidos', logado, async (req, res) =>
-  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,p.entrega_etapa,(p.rua IS NOT NULL) AS tem_end,l.nome AS loja_nome,(l.mp_access_token IS NOT NULL) AS mp
+  res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,p.entrega_etapa,p.frete_valor,(p.rua IS NOT NULL) AS tem_end,l.nome AS loja_nome,(l.mp_access_token IS NOT NULL) AS mp
                       FROM pedidos p LEFT JOIN lojas l ON l.id=p.loja_id WHERE p.usuario_id=? ORDER BY p.criado DESC`, req.u.id)));
 
 // ---------- COMPROVANTE, APROVAÇÃO E CHAT ----------
