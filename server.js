@@ -43,6 +43,7 @@ async function criarTabelas() {
   CREATE TABLE IF NOT EXISTS mensagens(id SERIAL PRIMARY KEY, pedido_id INTEGER, autor_id INTEGER, texto TEXT, criado BIGINT);
   CREATE INDEX IF NOT EXISTS idx_msg_pedido ON mensagens(pedido_id);
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aceite_politica BIGINT;
+  ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS prefs_notif TEXT;
   ALTER TABLE vales ADD COLUMN IF NOT EXISTS saldo DOUBLE PRECISION;
   UPDATE vales SET saldo = CASE WHEN usado=1 THEN 0 ELSE valor END WHERE saldo IS NULL;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS estado TEXT;
@@ -88,8 +89,9 @@ const VALES = [10, 30, 50, 70, 100, 200, 250, 300, 400, 500];
 const MAX_CUPOM = 50;
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 const digits = s => String(s || '').replace(/\D/g, '');
-const txt = s => String(s ?? '').trim();
-const ehImagem = s => typeof s === 'string' && s.startsWith('data:image/');
+const txt = (s, n = 2000) => String(s ?? '').trim().slice(0, n);       // todo texto recebido tem tamanho máximo
+const IMG_RE = /^data:image\/(png|jpeg|webp|gif);base64,(iVBOR|\/9j\/|UklGR|R0lGOD)[A-Za-z0-9+/]+={0,2}$/;   // só PNG, JPEG, WebP e GIF reais (nada de SVG nem texto extra)
+const ehImagem = (s, max = 1500000) => typeof s === 'string' && s.length <= max && IMG_RE.test(s);
 function cpfOk(c) {
   c = digits(c); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false;
   for (const k of [9, 10]) { let s = 0; for (let i = 0; i < k; i++) s += c[i] * (k + 1 - i); if (((s * 10) % 11) % 10 !== Number(c[k])) return false; }
@@ -99,18 +101,67 @@ const slugar = s => txt(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036
 
 const app = express();
 app.set('trust proxy', 1);
-app.use('/api/admin/banner-video', express.json({ limit: '20mb' })); // só o vídeo do ADM aceita corpo grande
-app.use(express.json({ limit: '6mb' }));
-app.use(session({
-  store: new PgSession({ pool, createTableIfMissing: true }), // login guardado no Supabase
-  secret: process.env.SEGREDO || 'troque-este-segredo', resave: false, saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 30 * 24 * 3600 * 1000 },
+app.disable('x-powered-by');
+const EM_PRODUCAO = !!process.env.RENDER || process.env.NODE_ENV === 'production';
+if ((process.env.SEGREDO || '').length < 24) console.warn('AVISO DE SEGURANÇA: defina SEGREDO com 24 ou mais caracteres no Render.');
+
+// HTTPS obrigatório (o /api/saude fica de fora para os monitores)
+app.use((req, res, next) => {
+  if (EM_PRODUCAO && !req.secure && req.path !== '/api/saude')
+    return res.redirect(301, (SITE_URL || 'https://' + req.headers.host) + req.originalUrl);
+  next();
+});
+// cabeçalhos de segurança
+app.use((req, res, next) => {
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Resource-Policy': 'same-origin' });
+  if (req.secure) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+// limitador de tentativas (fica na memória; zera quando o servidor reinicia)
+const janelas = new Map();
+function limitar(chave, max, ms) {
+  const agora = Date.now(); let j = janelas.get(chave);
+  if (!j || agora > j.fim) { j = { n: 0, fim: agora + ms }; janelas.set(chave, j); }
+  return ++j.n <= max;
+}
+setInterval(() => { const agora = Date.now(); for (const [k, j] of janelas) if (agora > j.fim) janelas.delete(k); }, 60000).unref();
+const limite = (nome, max, ms, porUsuario = false) => (req, res, next) =>
+  limitar(`${nome}:${porUsuario && req.u ? 'u' + req.u.id : req.ip}`, max, ms) ? next() : res.status(429).json({ erro: 'Muitas tentativas. Aguarde um pouco e tente de novo.' });
+const senhaForte = s => typeof s === 'string' && s.length >= 8 && s.length <= 72 && /[A-Za-z]/.test(s) && /\d/.test(s);
+const DUMMY = bcrypt.hashSync('senha-falsa-para-igualar-o-tempo', 12);
+const entrar = (req, uid) => new Promise((ok, no) => req.session.regenerate(e => {   // sessão nova a cada login (evita fixação de sessão)
+  if (e) return no(e); req.session.uid = uid; req.session.save(e2 => (e2 ? no(e2) : ok()));
 }));
-app.use(async (req, res, next) => {
+// proteção da API: limite geral, anti-CSRF (cabeçalho próprio + origem) e sem cache
+app.use('/api', (req, res, next) => {
+  if (req.path === '/mp/webhook' || req.path === '/saude' || req.path.startsWith('/banner/video')) return next();
+  return limite('api', 300, 60000)(req, res, next);
+});
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.path === '/mp/webhook') return next();
+  const o = req.headers.origin;
+  if (o) { try { if (new URL(o).host !== req.headers.host) return res.status(403).json({ erro: 'Origem não permitida.' }); } catch (e) { return res.status(403).json({ erro: 'Origem inválida.' }); } }
+  if (req.headers['x-kivra'] !== '1') return res.status(403).json({ erro: 'Requisição não permitida.' });
+  next();
+});
+app.use('/api', (req, res, next) => { if (!req.path.startsWith('/banner/video')) res.set('Cache-Control', 'no-store'); next(); });
+process.on('unhandledRejection', e => console.error('Promessa rejeitada:', e));
+app.use('/api', session({
+  store: new PgSession({ pool, createTableIfMissing: true }), // login guardado no Supabase
+  name: 'kivra.sid', secret: process.env.SEGREDO || 'troque-este-segredo', resave: false, saveUninitialized: false, rolling: true,
+  cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 14 * 24 * 3600 * 1000 },
+}));
+app.use('/api', async (req, res, next) => {
   req.u = req.session.uid ? await get('SELECT * FROM usuarios WHERE id=?', req.session.uid) : null;
   if (req.u && req.u.bloqueado) { req.u = null; req.session.uid = null; }
   next();
 });
+app.use('/api/admin/banner-video',   // só o ADM pode mandar um corpo grande (vídeo), e a checagem vem antes de ler o corpo
+  (req, res, next) => (req.u && req.u.papel === 'admin' && req.u.email === ADMIN_EMAIL ? next() : res.status(403).json({ erro: 'Acesso negado.' })),
+  express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '4mb' }));
 const logado = (req, res, next) => req.u ? next() : res.status(401).json({ erro: 'Entre na sua conta.' });
 const vendedor = async (req, res, next) => {
   if (!req.u || req.u.papel !== 'vendedor') return res.status(403).json({ erro: 'Apenas vendedores.' });
@@ -120,32 +171,35 @@ const admin = (req, res, next) =>
   req.u && req.u.papel === 'admin' && req.u.email === ADMIN_EMAIL ? next() : res.status(403).json({ erro: 'Acesso negado.' });
 
 // ---------- CONTA ----------
-app.post('/api/cadastro', async (req, res) => {
+app.post('/api/cadastro', limite('cad', 8, 3600000), async (req, res) => {
   const { senha, confirmar, cpf, nomeLoja } = req.body;
-  const email = txt(req.body.email).toLowerCase();
+  const email = txt(req.body.email, 200).toLowerCase();
   const tipo = req.body.tipo === 'vendedor' ? 'vendedor' : 'cliente';
   if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ erro: 'E-mail inválido.' });
-  if (!senha || senha.length < 6) return res.status(400).json({ erro: 'Senha com no mínimo 6 caracteres.' });
+  if (!senhaForte(senha)) return res.status(400).json({ erro: 'A senha precisa ter de 8 a 72 caracteres, com letras e números.' });
   if (senha !== confirmar) return res.status(400).json({ erro: 'As senhas não são iguais.' });
   if (!req.body.aceite) return res.status(400).json({ erro: 'Aceite a Política de Privacidade para criar a conta.' });
   if (await get('SELECT 1 AS x FROM usuarios WHERE email=?', email)) return res.status(400).json({ erro: 'E-mail já cadastrado.' });
   if (tipo === 'vendedor' && (!cpfOk(cpf) || !txt(nomeLoja))) return res.status(400).json({ erro: 'Vendedor precisa de CPF válido e nome da loja.' });
   const papel = email === ADMIN_EMAIL ? 'admin' : tipo;
   const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado,aceite_politica) VALUES(?,?,?,?,?,?) RETURNING id',
-    email, bcrypt.hashSync(senha, 10), papel, tipo === 'vendedor' ? cifrar(digits(cpf)) : null, Date.now(), Date.now());
+    email, await bcrypt.hash(senha, 12), papel, tipo === 'vendedor' ? cifrar(digits(cpf)) : null, Date.now(), Date.now());
   if (tipo === 'vendedor') {
     let slug = slugar(nomeLoja); if (await get('SELECT 1 AS x FROM lojas WHERE slug=?', slug)) slug += '-' + crypto.randomBytes(2).toString('hex');
     await run('INSERT INTO lojas(usuario_id,slug,nome) VALUES(?,?,?)', u.id, slug, txt(nomeLoja));
   }
-  req.session.uid = u.id; res.json({ ok: true });
+  await entrar(req, u.id); res.json({ ok: true });
 });
-app.post('/api/login', async (req, res) => {
-  const u = await get('SELECT * FROM usuarios WHERE email=?', txt(req.body.email).toLowerCase());
-  if (!u || !bcrypt.compareSync(req.body.senha || '', u.senha_hash)) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
+app.post('/api/login', limite('login', 15, 15 * 60000), async (req, res) => {
+  const email = txt(req.body.email, 200).toLowerCase();
+  if (!limitar('login-e:' + email, 8, 15 * 60000)) return res.status(429).json({ erro: 'Muitas tentativas para este e-mail. Aguarde alguns minutos.' });
+  const u = await get('SELECT * FROM usuarios WHERE email=?', email);
+  const ok = await bcrypt.compare(String(req.body.senha || '').slice(0, 100), u ? u.senha_hash : DUMMY);   // leva o mesmo tempo com e-mail inexistente
+  if (!u || !ok) return res.status(401).json({ erro: 'E-mail ou senha incorretos.' });
   if (u.bloqueado) return res.status(403).json({ erro: 'Conta bloqueada. Fale com o administrador.' });
-  req.session.uid = u.id; res.json({ ok: true });
+  await entrar(req, u.id); res.json({ ok: true });
 });
-app.post('/api/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
+app.post('/api/logout', (req, res) => req.session.destroy(() => { res.clearCookie('kivra.sid'); res.json({ ok: true }); }));
 app.get('/api/eu', async (req, res) => {
   if (!req.u) return res.json({ logado: false });
   const loja = req.u.papel === 'vendedor' ? await get('SELECT id,usuario_id,slug,nome,quem_somos,whatsapp,pix,cep_origem,loja_estado,loja_cidade,loja_bairro,loja_rua,loja_numero,(mp_access_token IS NOT NULL) AS mp_conectado FROM lojas WHERE usuario_id=?', req.u.id) : null;
@@ -162,7 +216,7 @@ app.get('/api/produtos', async (req, res) => {
   if (min !== undefined && min !== '') { sql += ' AND p.preco>=?'; a.push(Number(min)); }
   if (max !== undefined && max !== '') { sql += ' AND p.preco<=?'; a.push(Number(max)); }
   if (loja) { sql += ' AND l.slug=?'; a.push(loja); }
-  res.json(await all(sql + ' ORDER BY p.criado DESC', ...a));
+  res.json(await all(sql + ' ORDER BY p.criado DESC LIMIT 300', ...a));
 });
 // Loja que mais vendeu na semana (pedidos aprovados nos últimos 7 dias); sem vendas na semana, a que mais vendeu no total
 app.get('/api/lojas/destaque', async (req, res) => {
@@ -212,6 +266,7 @@ app.post('/api/vendedor/produtos', vendedor, async (req, res) => {
   const L = req.loja;                // a loja precisa ter endereço antes de cadastrar produtos
   if (!(L.cep_origem && L.loja_estado && L.loja_cidade && L.loja_bairro && L.loja_rua && L.loja_numero))
     return res.status(400).json({ erro: 'Preencha o endereço da loja em Minha loja → Loja antes de cadastrar produtos.' });
+  if ((await get('SELECT COUNT(*) AS n FROM produtos WHERE loja_id=?', L.id)).n >= 500) return res.status(400).json({ erro: 'Limite de 500 produtos por loja.' });
   const d = { nome: txt(nome), tamanho: txt(tamanho) };
   for (const c of CLASSES[classe]) if (!d[c]) return res.status(400).json({ erro: `Informe o campo: ${c}.` });
   if (!txt(descricao)) return res.status(400).json({ erro: 'Informe a descrição.' });
@@ -243,7 +298,7 @@ app.get('/api/vendedor/vales', vendedor, async (req, res) => res.json(await all(
 app.post('/api/vendedor/vales', vendedor, async (req, res) => {
   const valor = Number(req.body.valor);
   if (!VALES.includes(valor)) return res.status(400).json({ erro: 'Valor não disponível para vale presente.' });
-  const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  const codigo = 'VP-' + crypto.randomBytes(6).toString('hex').toUpperCase();
   await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', req.loja.id, codigo, valor, valor, Date.now());
   res.json({ ok: true, codigo, valor });
 });
@@ -254,7 +309,7 @@ app.post('/api/vendedor/avisos', vendedor, async (req, res) => {
   res.json({ ok: true });
 });
 app.get('/api/vendedor/pedidos', vendedor, async (req, res) =>
-  res.json(await all(`SELECT * FROM pedidos WHERE loja_id=? ORDER BY criado ${req.query.ordem === 'antigos' ? 'ASC' : 'DESC'}`, req.loja.id)));
+  res.json(await all(`SELECT * FROM pedidos WHERE loja_id=? ORDER BY criado ${req.query.ordem === 'antigos' ? 'ASC' : 'DESC'} LIMIT 300`, req.loja.id)));
 
 async function relatorio(lojaId) {
   const d = new Date(), y = d.getFullYear(), m = d.getMonth();
@@ -272,7 +327,7 @@ async function relatorio(lojaId) {
 app.get('/api/vendedor/relatorio', vendedor, async (req, res) => res.json(await relatorio(req.loja.id)));
 
 // ---------- PEDIDOS ----------
-app.post('/api/pedidos', logado, async (req, res) => {
+app.post('/api/pedidos', logado, limite('pedido', 30, 3600000, true), async (req, res) => {
   const b = req.body; let loja_id, item, preco, produto_id = null;
   if (b.vale_valor) {
     const l = await get('SELECT id FROM lojas WHERE id=?', b.loja_id);
@@ -295,6 +350,7 @@ app.post('/api/pedidos', logado, async (req, res) => {
   if (digits(b.telefone).length < 10) return res.status(400).json({ erro: 'Telefone inválido (DDD + número).' });
   if (!['pix', 'credito', 'debito'].includes(b.metodo)) return res.status(400).json({ erro: 'Forma de pagamento inválida.' });
 
+  if ((txt(b.cupom) || txt(b.vale_codigo)) && !limitar('cod:' + req.u.id, 20, 3600000)) return res.status(429).json({ erro: 'Muitas tentativas com códigos. Aguarde um pouco.' });
   let desconto = 0, cupom = null;
   if (txt(b.cupom) && produto_id) {
     const c = await get('SELECT * FROM cupons WHERE loja_id=? AND codigo=? AND ativo=1', loja_id, txt(b.cupom).toUpperCase());
@@ -334,7 +390,7 @@ app.post('/api/pedidos', logado, async (req, res) => {
 });
 app.get('/api/meus-pedidos', logado, async (req, res) =>
   res.json(await all(`SELECT p.id,p.item,p.preco,p.metodo,p.status,p.criado,(p.comprovante IS NOT NULL) AS tem_comp,p.entrega_etapa,p.frete_valor,(p.rua IS NOT NULL) AS tem_end,l.nome AS loja_nome,(l.mp_access_token IS NOT NULL) AS mp
-                      FROM pedidos p LEFT JOIN lojas l ON l.id=p.loja_id WHERE p.usuario_id=? ORDER BY p.criado DESC`, req.u.id)));
+                      FROM pedidos p LEFT JOIN lojas l ON l.id=p.loja_id WHERE p.usuario_id=? ORDER BY p.criado DESC LIMIT 200`, req.u.id)));
 
 // ---------- COMPROVANTE, APROVAÇÃO E CHAT ----------
 async function acessoPedido(req, res) {   // só o comprador e o vendedor da loja enxergam o pedido
@@ -363,7 +419,7 @@ app.get('/api/pedidos/:id/mensagens', logado, async (req, res) => {
   if (m.length) await marcarLida(req.u.id, `p:${p.id}`, m[m.length - 1].id);
   res.json({ mensagens: m.map(x => ({ id: x.id, texto: x.texto, criado: x.criado, minha: x.autor_id === req.u.id })) });
 });
-app.post('/api/pedidos/:id/mensagens', logado, async (req, res) => {
+app.post('/api/pedidos/:id/mensagens', logado, limite('msg', 60, 60000, true), async (req, res) => {
   const p = await acessoPedido(req, res); if (!p) return;
   const texto = txt(req.body.texto).slice(0, 1000);
   if (!texto) return res.status(400).json({ erro: 'Escreva uma mensagem.' });
@@ -381,7 +437,7 @@ app.post('/api/vendedor/pedidos/:id/status', vendedor, async (req, res) => {
   let msg = st === 'aprovado' ? 'Pedido aprovado ✅' : 'Pedido recusado ❌. Se tiver dúvidas, fale comigo por aqui.';
   if (st === 'recusado' && p.produto_id) await run(`UPDATE produtos SET estoque=estoque+1 WHERE id=? AND classe<>'servicos'`, p.produto_id);
   if (st === 'aprovado' && !p.produto_id) {       // vale presente: gera o código na aprovação
-    const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    const codigo = 'VP-' + crypto.randomBytes(6).toString('hex').toUpperCase();
     await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', req.loja.id, codigo, p.preco_original, p.preco_original, Date.now());
     msg += ` Código do seu vale presente: ${codigo}`;
   }
@@ -424,7 +480,7 @@ const enviaLoja = async (req, res, lojaId, clienteId) => {
   res.json({ ok: true });
 };
 app.get('/api/lojas/:id/mensagens', logado, async (req, res) => msgsLoja(req, res, Number(req.params.id), req.u.id));
-app.post('/api/lojas/:id/mensagens', logado, async (req, res) => {
+app.post('/api/lojas/:id/mensagens', logado, limite('msg', 60, 60000, true), async (req, res) => {
   if (!(await get('SELECT 1 AS x FROM lojas WHERE id=?', req.params.id))) return res.status(404).json({ erro: 'Loja não encontrada.' });
   await enviaLoja(req, res, Number(req.params.id), req.u.id);
 });
@@ -432,7 +488,7 @@ app.get('/api/vendedor/conversas', vendedor, async (req, res) => res.json(await 
   `SELECT m.cliente_id, u.email, MAX(m.criado) AS ultima FROM mensagens m JOIN usuarios u ON u.id=m.cliente_id
    WHERE m.loja_id=? AND m.pedido_id IS NULL GROUP BY m.cliente_id, u.email ORDER BY ultima DESC`, req.loja.id)));
 app.get('/api/vendedor/conversas/:cid/mensagens', vendedor, async (req, res) => msgsLoja(req, res, req.loja.id, Number(req.params.cid)));
-app.post('/api/vendedor/conversas/:cid/mensagens', vendedor, async (req, res) => enviaLoja(req, res, req.loja.id, Number(req.params.cid)));
+app.post('/api/vendedor/conversas/:cid/mensagens', vendedor, limite('msg', 60, 60000, true), async (req, res) => enviaLoja(req, res, req.loja.id, Number(req.params.cid)));
 
 // ---------- VÍDEO DO BANNER INICIAL (só o ADM envia) ----------
 app.get('/api/banner/info', async (req, res) => {
@@ -567,7 +623,7 @@ app.all('/api/mp/webhook', async (req, res) => {
     if (!ok) return;                           // já tinha sido aprovado (aviso repetido)
     let msg = 'Pagamento confirmado pelo Mercado Pago ✅ Pedido aprovado.';
     if (!p.produto_id) {
-      const codigo = 'VP-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+      const codigo = 'VP-' + crypto.randomBytes(6).toString('hex').toUpperCase();
       await run('INSERT INTO vales(loja_id,codigo,valor,saldo,criado) VALUES(?,?,?,?,?)', p.loja_id, codigo, p.preco_original, p.preco_original, Date.now());
       msg += ` Código do seu vale presente: ${codigo}`;
     }
@@ -780,9 +836,15 @@ async function migrarCpf() {     // criptografa CPFs antigos que ainda estavam e
 }
 
 // ---------- NOTIFICAÇÕES, CHAT (CAIXA DE ENTRADA) E CONTADORES ----------
-const notificar = (uid, tipo, titulo, texto, destino) => uid
-  ? run('INSERT INTO notificacoes(usuario_id,tipo,titulo,texto,destino,criada) VALUES(?,?,?,?,?,?)', uid, tipo, titulo, texto, destino, Date.now()).catch(e => console.error('notificar:', e.message))
-  : null;
+const notificar = async (uid, tipo, titulo, texto, destino) => {      // respeita as preferências de notificação de cada pessoa
+  if (!uid) return;
+  try {
+    const u = await get('SELECT prefs_notif FROM usuarios WHERE id=?', uid);
+    let p = {}; try { p = JSON.parse((u && u.prefs_notif) || '{}'); } catch (e) {}
+    if (p[tipo] === false) return;
+    await run('INSERT INTO notificacoes(usuario_id,tipo,titulo,texto,destino,criada) VALUES(?,?,?,?,?,?)', uid, tipo, titulo, texto, destino, Date.now());
+  } catch (e) { console.error('notificar:', e.message); }
+};
 const marcarLida = (uid, chave, ate) => run(
   'INSERT INTO leituras(usuario_id,chave,lida_ate) VALUES(?,?,?) ON CONFLICT (usuario_id,chave) DO UPDATE SET lida_ate=GREATEST(leituras.lida_ate, EXCLUDED.lida_ate)', uid, chave, ate);
 app.get('/api/notificacoes', logado, async (req, res) =>
@@ -841,14 +903,106 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   catch (e) { res.status(500).json({ erro: 'O conteúdo do assetlinks não é um JSON válido. Cole o arquivo inteiro, começando em [ e terminando em ].' }); }
 });
 
+// ---------- SENHA E PAINEL DE SEGURANÇA ----------
+app.post('/api/senha', logado, limite('senha', 10, 3600000, true), async (req, res) => {
+  const { atual, nova, confirmar } = req.body;
+  if (!(await bcrypt.compare(String(atual || '').slice(0, 100), req.u.senha_hash))) return res.status(400).json({ erro: 'A senha atual está incorreta.' });
+  if (!senhaForte(nova)) return res.status(400).json({ erro: 'A nova senha precisa ter de 8 a 72 caracteres, com letras e números.' });
+  if (nova !== confirmar) return res.status(400).json({ erro: 'As senhas não são iguais.' });
+  await run('UPDATE usuarios SET senha_hash=? WHERE id=?', await bcrypt.hash(nova, 12), req.u.id);
+  try { await run(`DELETE FROM session WHERE (sess::jsonb ->> 'uid') = ? AND sid <> ?`, String(req.u.id), req.sessionID); }   // sai de todos os outros aparelhos
+  catch (e) { console.error('Encerrar outras sessões:', e.message); }
+  res.json({ ok: true });
+});
+app.get('/api/admin/seguranca', admin, async (req, res) => {
+  const sem = await all(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity`);
+  res.json({ https: /^https:\/\//.test(SITE_URL), segredo: (process.env.SEGREDO || '').length >= 24, admin_email: !!ADMIN_EMAIL,
+             rls: sem.length === 0, sem_rls: sem.map(x => x.tablename), csp_ativo: !process.env.CSP_REPORT_ONLY });
+});
+
+// ---------- CONFIGURAÇÕES DA CONTA (preferências, dados e exclusão — direitos da LGPD) ----------
+const PREFS_PADRAO = { pedido: true, entrega: true, pagamento: true };
+const lerPrefs = u => { try { return { ...PREFS_PADRAO, ...JSON.parse(u.prefs_notif || '{}') }; } catch (e) { return { ...PREFS_PADRAO }; } };
+app.get('/api/config', logado, (req, res) => res.json({ email: req.u.email, papel: req.u.papel, prefs: lerPrefs(req.u) }));
+app.put('/api/config/notificacoes', logado, async (req, res) => {
+  const p = {}; for (const k of Object.keys(PREFS_PADRAO)) p[k] = req.body[k] !== false;
+  await run('UPDATE usuarios SET prefs_notif=? WHERE id=?', JSON.stringify(p), req.u.id);
+  res.json({ ok: true });
+});
+app.post('/api/conta/sair-todos', logado, async (req, res) => {
+  try { await run(`DELETE FROM session WHERE (sess::jsonb ->> 'uid') = ?`, String(req.u.id)); } catch (e) { console.error('Encerrar sessões:', e.message); }
+  req.session.destroy(() => { res.clearCookie('kivra.sid'); res.json({ ok: true }); });
+});
+app.get('/api/meus-dados', logado, async (req, res) => {      // cópia dos dados da própria pessoa (portabilidade)
+  const u = req.u; let cpf = null;
+  if (u.cpf) { try { cpf = decifrar(u.cpf); } catch (e) { cpf = u.cpf; } }
+  const loja = u.papel === 'vendedor' ? await get('SELECT nome,slug,quem_somos,cep_origem,loja_estado,loja_cidade,loja_bairro,loja_rua,loja_numero FROM lojas WHERE usuario_id=?', u.id) : null;
+  res.json({ gerado_em: Date.now(),
+    conta: { email: u.email, tipo: u.papel, cpf, criada_em: u.criado, aceitou_a_politica_em: u.aceite_politica },
+    loja,
+    enderecos: await all('SELECT apelido,cep,estado,cidade,bairro,rua,numero FROM enderecos WHERE usuario_id=? ORDER BY id', u.id),
+    pedidos: await all('SELECT id,item,preco,metodo,status,nome,cep,estado,cidade,bairro,rua,numero,telefone,frete_servico,frete_valor,criado FROM pedidos WHERE usuario_id=? ORDER BY id', u.id),
+    mensagens_enviadas: await all('SELECT pedido_id,texto,criado FROM mensagens WHERE autor_id=? ORDER BY id', u.id) });
+});
+app.post('/api/conta/excluir', logado, limite('excluir', 5, 3600000, true), async (req, res) => {
+  if (req.u.papel === 'admin') return res.status(400).json({ erro: 'A conta de administrador não pode ser excluída por aqui.' });
+  if (!(await bcrypt.compare(String(req.body.senha || '').slice(0, 100), req.u.senha_hash))) return res.status(400).json({ erro: 'Senha incorreta.' });
+  const id = req.u.id, loja = req.u.papel === 'vendedor' ? await get('SELECT id FROM lojas WHERE usuario_id=?', id) : null;
+  if (loja && (await get('SELECT COUNT(*) AS n FROM pedidos WHERE loja_id=?', loja.id)).n > 0)
+    return res.status(400).json({ erro: 'A sua loja tem pedidos registrados. Para excluir a conta, escreva para o e-mail de contato da Política de Privacidade.' });
+  if (loja) {
+    for (const t of ['produtos', 'cupons', 'vales', 'avisos']) await run(`DELETE FROM ${t} WHERE loja_id=?`, loja.id);
+    await run('DELETE FROM mensagens WHERE loja_id=?', loja.id); await run('DELETE FROM lojas WHERE id=?', loja.id);
+  }
+  // pedidos antigos ficam sem os dados pessoais (anonimizados); o restante é apagado
+  await run(`UPDATE pedidos SET usuario_id=NULL, nome='Cliente removido', telefone=NULL, cep=NULL, cidade=NULL, bairro=NULL, rua=NULL, numero=NULL, ip=NULL WHERE usuario_id=?`, id);
+  await run(`UPDATE mensagens SET autor_id=NULL, texto='[mensagem removida]' WHERE autor_id=?`, id);
+  await run('DELETE FROM mensagens WHERE pedido_id IS NULL AND cliente_id=?', id);
+  for (const t of ['enderecos', 'notificacoes']) await run(`DELETE FROM ${t} WHERE usuario_id=?`, id);
+  await run('DELETE FROM leituras WHERE usuario_id=?', id);
+  try { await run(`DELETE FROM session WHERE (sess::jsonb ->> 'uid') = ?`, String(id)); } catch (e) { console.error('Encerrar sessões:', e.message); }
+  await run('DELETE FROM usuarios WHERE id=?', id);
+  req.session.destroy(() => { res.clearCookie('kivra.sid'); res.json({ ok: true }); });
+});
+
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
-app.use(express.static(PUBLIC, { setHeaders: (res, p) => { if (/(sw\.js|index\.html|manifest\.json)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
-app.get('/', (req, res) => {
-  const f = path.join(PUBLIC, 'index.html');
-  fs.existsSync(f) ? res.sendFile(f) : res.status(404).send('<h3>index.html não encontrado na pasta public</h3>');
+const INDEX = (() => { try { return fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'); } catch (e) { return null; } })();
+// Política de segurança do navegador: só roda o script que o servidor assina com um código novo a cada visita
+const csp = (n, https) => ["default-src 'self'", `script-src 'self' 'nonce-${n}'`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  'font-src https://fonts.gstatic.com', "img-src 'self' data: blob:", "media-src 'self' blob:",
+  "connect-src 'self' https://viacep.com.br https://servicodados.ibge.gov.br", "worker-src 'self'", "manifest-src 'self'", "object-src 'none'",
+  "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", ...(https ? ['upgrade-insecure-requests'] : [])].join('; ');
+app.get(['/', '/index.html'], (req, res) => {
+  if (!INDEX) return res.status(404).send('<h3>index.html não encontrado na pasta public</h3>');
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.set(process.env.CSP_REPORT_ONLY ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy', csp(nonce, req.secure));
+  res.set('Cache-Control', 'no-cache').type('html').send(INDEX.replace(/<script>/g, `<script nonce="${nonce}">`));
 });
-app.use((err, req, res, next) => { console.error(err); res.status(500).json({ erro: 'Erro interno do servidor.' }); });
+app.use(express.static(PUBLIC, { index: false, setHeaders: (res, p) => {
+  if (/(sw\.js|manifest\.json)$/.test(p)) res.setHeader('Cache-Control', 'no-cache');
+  if (/offline\.html$/.test(p)) res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+} }));
+app.use((err, req, res, next) => {
+  if (err && err.type === 'entity.too.large') return res.status(413).json({ erro: 'Arquivo ou texto grande demais.' });
+  if (err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError)) return res.status(400).json({ erro: 'Requisição inválida.' });
+  console.error(err); res.status(500).json({ erro: 'Erro interno do servidor.' });
+});
 
-criarTabelas().then(migrarCpf).then(() => app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000))))
-  .catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
+// liga a proteção por linha (RLS) em todas as tabelas e tira o acesso público da API do Supabase; o servidor usa a conexão direta e não é afetado
+async function blindarBanco() {
+  try {
+    await pool.query(`DO $$ DECLARE t text; BEGIN
+      FOR t IN SELECT tablename FROM pg_tables WHERE schemaname='public' LOOP EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t); END LOOP;
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN
+        EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon'; EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon'; END IF;
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
+        EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA public FROM authenticated'; EXECUTE 'REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM authenticated'; END IF;
+    END $$;`);
+  } catch (e) { console.error('Aviso: não foi possível ativar o RLS:', e.message); }
+}
+
+criarTabelas().then(migrarCpf).then(blindarBanco).then(() => {
+  app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000)));
+  setTimeout(blindarBanco, 90000).unref();   // pega também a tabela de sessões, criada no primeiro acesso
+}).catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
