@@ -44,6 +44,8 @@ async function criarTabelas() {
   CREATE INDEX IF NOT EXISTS idx_msg_pedido ON mensagens(pedido_id);
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aceite_politica BIGINT;
   ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS prefs_notif TEXT;
+  ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aceite_versao TEXT;
+  CREATE TABLE IF NOT EXISTS denuncias(id SERIAL PRIMARY KEY, usuario_id INTEGER, loja_id INTEGER, produto_id INTEGER, motivo TEXT, detalhe TEXT, criada BIGINT, resolvida INTEGER DEFAULT 0);
   ALTER TABLE vales ADD COLUMN IF NOT EXISTS saldo DOUBLE PRECISION;
   UPDATE vales SET saldo = CASE WHEN usado=1 THEN 0 ELSE valor END WHERE saldo IS NULL;
   ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS estado TEXT;
@@ -182,8 +184,8 @@ app.post('/api/cadastro', limite('cad', 8, 3600000), async (req, res) => {
   if (await get('SELECT 1 AS x FROM usuarios WHERE email=?', email)) return res.status(400).json({ erro: 'E-mail já cadastrado.' });
   if (tipo === 'vendedor' && (!cpfOk(cpf) || !txt(nomeLoja))) return res.status(400).json({ erro: 'Vendedor precisa de CPF válido e nome da loja.' });
   const papel = email === ADMIN_EMAIL ? 'admin' : tipo;
-  const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado,aceite_politica) VALUES(?,?,?,?,?,?) RETURNING id',
-    email, await bcrypt.hash(senha, 12), papel, tipo === 'vendedor' ? cifrar(digits(cpf)) : null, Date.now(), Date.now());
+  const u = await get('INSERT INTO usuarios(email,senha_hash,papel,cpf,criado,aceite_politica,aceite_versao) VALUES(?,?,?,?,?,?,?) RETURNING id',
+    email, await bcrypt.hash(senha, 12), papel, tipo === 'vendedor' ? cifrar(digits(cpf)) : null, Date.now(), Date.now(), 'politica-1.2;termos-1.0');
   if (tipo === 'vendedor') {
     let slug = slugar(nomeLoja); if (await get('SELECT 1 AS x FROM lojas WHERE slug=?', slug)) slug += '-' + crypto.randomBytes(2).toString('hex');
     await run('INSERT INTO lojas(usuario_id,slug,nome) VALUES(?,?,?)', u.id, slug, txt(nomeLoja));
@@ -222,7 +224,7 @@ app.get('/api/produtos', async (req, res) => {
 app.get('/api/lojas/destaque', async (req, res) => {
   const base = filtro => `SELECT l.nome,l.slug,l.avatar,COUNT(p.id) AS vendas,COALESCE(SUM(p.preco),0) AS total
     FROM pedidos p JOIN lojas l ON l.id=p.loja_id JOIN usuarios u ON u.id=l.usuario_id
-    WHERE p.status='aprovado' AND u.bloqueado=0 ${filtro}
+    WHERE p.status='aprovado' AND u.bloqueado=0 AND p.usuario_id IS DISTINCT FROM l.usuario_id ${filtro}
     GROUP BY l.id,l.nome,l.slug,l.avatar ORDER BY vendas DESC,total DESC LIMIT 1`;
   let r = await get(base('AND COALESCE(p.aprovado_em,p.criado) > ?'), Date.now() - 7 * 24 * 3600 * 1000);
   if (r) return res.json({ ...r, semana: true });
@@ -255,6 +257,7 @@ app.put('/api/vendedor/loja', vendedor, async (req, res) => {
       return res.status(400).json({ erro: 'Preencha o endereço completo da loja: CEP, estado, cidade, bairro, rua e número.' });
     await run('UPDATE lojas SET cep_origem=?, loja_estado=?, loja_cidade=?, loja_bairro=?, loja_rua=?, loja_numero=? WHERE id=?', E.cep, E.uf, E.ci, E.ba, E.ru, E.nu, req.loja.id);
   }
+  if ((ehImagem(req.body.avatar) || ehImagem(req.body.banner)) && req.body.direitos !== true) return res.status(400).json({ erro: 'Confirme que você tem o direito de usar as imagens (fotos próprias ou autorizadas).' });
   if (ehImagem(req.body.avatar)) await run('UPDATE lojas SET avatar=? WHERE id=?', req.body.avatar, req.loja.id);
   if (ehImagem(req.body.banner)) await run('UPDATE lojas SET banner=? WHERE id=?', req.body.banner, req.loja.id);
   res.json({ ok: true });
@@ -267,6 +270,7 @@ app.post('/api/vendedor/produtos', vendedor, async (req, res) => {
   if (!(L.cep_origem && L.loja_estado && L.loja_cidade && L.loja_bairro && L.loja_rua && L.loja_numero))
     return res.status(400).json({ erro: 'Preencha o endereço da loja em Minha loja → Loja antes de cadastrar produtos.' });
   if ((await get('SELECT COUNT(*) AS n FROM produtos WHERE loja_id=?', L.id)).n >= 500) return res.status(400).json({ erro: 'Limite de 500 produtos por loja.' });
+  if (ehImagem(foto) && req.body.direitos !== true) return res.status(400).json({ erro: 'Confirme que você tem o direito de usar as imagens (fotos próprias ou autorizadas).' });
   const d = { nome: txt(nome), tamanho: txt(tamanho) };
   for (const c of CLASSES[classe]) if (!d[c]) return res.status(400).json({ erro: `Informe o campo: ${c}.` });
   if (!txt(descricao)) return res.status(400).json({ erro: 'Informe a descrição.' });
@@ -965,6 +969,30 @@ app.post('/api/conta/excluir', logado, limite('excluir', 5, 3600000, true), asyn
   req.session.destroy(() => { res.clearCookie('kivra.sid'); res.json({ ok: true }); });
 });
 
+// ---------- DENÚNCIAS, REMOÇÃO DE CONTEÚDO E LIMPEZA DE DADOS ANTIGOS ----------
+const MOTIVOS = { falso: 'Produto ou serviço falso / promessa enganosa', info_falsa: 'Avaliação ou informação falsa',
+  copyright: 'Uso indevido de imagem (direitos autorais)', ilegal: 'Conteúdo ilegal ou proibido', outro: 'Outro motivo' };
+app.post('/api/denuncias', logado, limite('denuncia', 10, 3600000, true), async (req, res) => {
+  const lojaId = parseInt(req.body.loja_id) || null, prodId = parseInt(req.body.produto_id) || null;
+  if (!lojaId && !prodId) return res.status(400).json({ erro: 'Escolha o que você quer denunciar.' });
+  await run('INSERT INTO denuncias(usuario_id,loja_id,produto_id,motivo,detalhe,criada) VALUES(?,?,?,?,?,?)',
+    req.u.id, lojaId, prodId, MOTIVOS[req.body.motivo] || MOTIVOS.outro, txt(req.body.detalhe, 1000), Date.now());
+  res.json({ ok: true });
+});
+app.get('/api/admin/denuncias', admin, async (req, res) => res.json(await all(
+  `SELECT d.id,d.motivo,d.detalhe,d.criada,d.resolvida,d.produto_id,u.email AS denunciante,l.nome AS loja,l.usuario_id AS dono_id,p.descricao AS produto
+   FROM denuncias d LEFT JOIN usuarios u ON u.id=d.usuario_id LEFT JOIN produtos p ON p.id=d.produto_id
+   LEFT JOIN lojas l ON l.id=COALESCE(d.loja_id,p.loja_id) ORDER BY d.resolvida, d.id DESC LIMIT 100`)));
+app.post('/api/admin/denuncias/:id/resolver', admin, async (req, res) => { await run('UPDATE denuncias SET resolvida=1 WHERE id=?', req.params.id); res.json({ ok: true }); });
+app.delete('/api/admin/produtos/:id', admin, async (req, res) => { await run('DELETE FROM produtos WHERE id=?', req.params.id); res.json({ ok: true }); });
+async function limparAntigos() {         // não guarda dados por mais tempo do que o necessário
+  const dia = 24 * 3600 * 1000;
+  try {
+    await run('DELETE FROM notificacoes WHERE criada < ?', Date.now() - 180 * dia);
+    await run('DELETE FROM denuncias WHERE resolvida=1 AND criada < ?', Date.now() - 365 * dia);
+  } catch (e) { console.error('limparAntigos:', e.message); }
+}
+
 // ---------- SITE ----------
 const PUBLIC = path.join(__dirname, 'public');
 const INDEX = (() => { try { return fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'); } catch (e) { return null; } })();
@@ -1004,5 +1032,6 @@ async function blindarBanco() {
 
 criarTabelas().then(migrarCpf).then(blindarBanco).then(() => {
   app.listen(process.env.PORT || 3000, () => console.log('Kivra rodando na porta ' + (process.env.PORT || 3000)));
-  setTimeout(blindarBanco, 90000).unref();   // pega também a tabela de sessões, criada no primeiro acesso
+  setTimeout(blindarBanco, 90000).unref();
+  limparAntigos(); setInterval(limparAntigos, 24 * 3600 * 1000).unref();   // pega também a tabela de sessões, criada no primeiro acesso
 }).catch(e => { console.error('Falha ao conectar no banco:', e.message); process.exit(1); });
